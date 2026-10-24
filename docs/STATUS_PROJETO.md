@@ -9,17 +9,17 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** Fase 1 em andamento. Próxima feature: **`FEAT-03`**.
+**Etapa Atual:** Fase 1 concluída. Próxima feature: **`FEAT-04`** (Fase 2).
 
 | ID | Fase | Feature | Requisitos / US | Status | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- |
 | **FEAT-01** | Fase 1 | Setup do Projeto, Configuração de Caminhos, Logs e Bootstrap de Pastas | RNF01, RNF02, RNF03, RNF06 | `concluida` | Validada em Python 3.12.10 |
 | **FEAT-02** | Fase 1 | Modelagem de Domínio e Schemas com Pydantic v2 | RNF02, RF18, US12 | `concluida` | — |
-| **FEAT-03** | Fase 1 | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `pendente` | Próxima feature (dependências concluídas) |
-| **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `pendente` | Dependências concluídas |
+| **FEAT-03** | Fase 1 | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `concluida` | — |
+| **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `pendente` | Próxima feature (dependências concluídas) |
 | **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `pendente` | Requer `bin/UnRAR.exe` |
-| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `pendente` | Depende de FEAT-03 e FEAT-04 |
-| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Depende de FEAT-03 e FEAT-05 |
+| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `pendente` | Depende de FEAT-04 |
+| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Depende de FEAT-05 |
 | **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `pendente` | Depende de FEAT-06 e FEAT-07 |
 | **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `pendente` | Depende de FEAT-07 e FEAT-08 |
 | **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `pendente` | Depende de FEAT-08 |
@@ -78,5 +78,15 @@
 * **Responsável:** Tech Lead
 * **Etapa Atual:** Fase 1 em andamento. Próxima feature: **`FEAT-03`**.
 * **Resumo das Mudanças:** por decisão do usuário (exceção pontual à regra append-only), o documento passou a ter **uma única tabela de features** (`Quadro de Features`), atualizada no próprio lugar. As tabelas repetidas dos registros #001 a #005 foram removidas; o conteúdo textual dos registros foi preservado. A regra de governança foi ajustada para refletir o novo formato.
+
+### [Registro #007] — 2026-10-24 — FEAT-03 Concluída (Fase 1 Finalizada)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 1 concluída. Próxima feature: **`FEAT-04`** (Fase 2).
+* **Resumo das Mudanças:**
+    * **FEAT-03:** implementado `src/infrastructure/json_repository.py` com `JsonStateRepository` e `LoadResult`:
+        * `save()`: escrita atômica (`state.json.tmp` $\rightarrow$ `os.replace`) com até 5 tentativas em `PermissionError`; em falha definitiva, remove o temporário e propaga o erro.
+        * `load()`: cria e retorna estado limpo na primeira abertura; gera o snapshot `state.json.bak` a cada carga válida; em `state.json` inválido (JSON malformado, vazio, bytes inválidos ou schema inválido), preserva o arquivo como `state.corrupt-<AAAAMMDD-HHMMSS>.json`, restaura do `.bak` ou inicia limpo, retornando `StateRecoveredWarning` em `LoadResult.recovery_warning`.
+    * Suíte de testes: **45 testes passando** (13 novos da FEAT-03), cobrindo os 5 critérios de aceite.
+    * `FEAT-03` $\rightarrow$ `concluida`.
 
 <!-- ADICIONE NOVOS REGISTROS ABAIXO DESTA LINHA (NÃO EDITE OS REGISTROS ACIMA) -->
