@@ -9,7 +9,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** Fase 3 em andamento. Próxima feature: **`FEAT-07`**.
+**Etapa Atual:** Fase 3 concluída. Próxima feature: **`FEAT-08`** (Fase 4 — início da interface gráfica).
 
 | ID | Fase | Feature | Requisitos / US | Status | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- |
@@ -19,8 +19,8 @@
 | **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `concluida` | — |
 | **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | Critério 6 (sem janela no `.exe`) será reconfirmado na FEAT-13 |
 | **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `concluida` | Gatilhos de atualização do RF19 (F5, retorno à Home) são integrados na FEAT-08/FEAT-10 |
-| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Próxima feature (dependências concluídas) |
-| **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `pendente` | Depende de FEAT-06 e FEAT-07 |
+| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `concluida` | — |
+| **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `pendente` | Próxima feature (dependências concluídas) |
 | **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `pendente` | Depende de FEAT-07 e FEAT-08 |
 | **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `pendente` | Depende de FEAT-08 |
 | **FEAT-11** | Fase 5 | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `pendente` | Depende de FEAT-05, FEAT-06 e FEAT-10 |
@@ -133,5 +133,19 @@
         * Entradas órfãs permanecem no `state.json`, mas ficam fora dos contadores e listagens (ADR-03); progresso é recuperado se o arquivo voltar ao disco. Séries sem HQs são descartadas.
     * Suíte de testes: **115 testes passando** (20 novos da FEAT-06), cobrindo os 7 critérios de aceite.
     * `FEAT-06` $\rightarrow$ `concluida`. Os gatilhos de atualização do RF19 (F5, botão "Atualizar", retorno à Home) dependem da UI e serão ligados na FEAT-08/FEAT-10.
+
+### [Registro #012] — 2026-10-24 — FEAT-07 Concluída (Fase 3 Finalizada)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 3 concluída. Próxima feature: **`FEAT-08`** (Fase 4 — início da interface gráfica).
+* **Resumo das Mudanças:**
+    * **FEAT-07:** implementado `src/services/cover_service.py` (`CoverService`, sem PySide6):
+        * `default_cover_jobs()` (thread principal) + `ensure_default_cover(series, comic_paths)` (seguro para o `CoverWorker`, não acessa o estado): gera a capa padrão a partir da página 0 da primeira HQ válida em ordem natural, pulando HQs inválidas; série sem HQ válida fica sem capa.
+        * `set_custom_cover()` e `restore_default_cover()`: atualizam o cache e o `state.json` (`custom_cover_image` relativo, ex: `covers\Batman.png`, e `cover_source`).
+        * `iter_thumbnails(comic_path)`: gerador que abre a HQ uma única vez e produz miniaturas de 250px; fechar o gerador libera o arquivo.
+        * Capas reduzidas para no máximo 400px de largura (miniaturas: 250px), mantendo a proporção e sem ampliar; gravação atômica (`.png.tmp` $\rightarrow$ `os.replace`).
+    * Complementos: `LibraryService.comic_path()` e `set_cover_reference()`; campo `SeriesDTO.has_custom_cover` (controla a opção "Restaurar capa padrão").
+    * **Ajuste de spec:** `build_thumbnail(comic_path, page_index)` substituído por `iter_thumbnails(comic_path)` em `PLANO_ARQUITETURA.md` (4.2) e `PLANO_DESENVOLVIMENTO.md` (FEAT-07 e FEAT-09). Motivo: chamar por página reabriria a HQ a cada miniatura e, em CBR, reextrairia o arquivo inteiro (custo O(n²), contrariando a ADR-06).
+    * Suíte de testes: **129 testes passando** (14 novos da FEAT-07), cobrindo os 4 critérios de aceite — incluindo verificação, em subprocesso, de que domínio, serviços e infraestrutura não importam PySide6.
+    * `FEAT-07` $\rightarrow$ `concluida`.
 
 <!-- ADICIONE NOVOS REGISTROS ABAIXO DESTA LINHA (NÃO EDITE OS REGISTROS ACIMA) -->

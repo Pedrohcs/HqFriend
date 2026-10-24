@@ -1,11 +1,12 @@
 """Sincronização disco vs state.json, contadores X/Y, status das séries e marcações (RF04-RF10, RF18)."""
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Iterable, List, Optional
 
 from src import config
 from src.domain.enums import SeriesStatus
 from src.domain.errors import StateRecoveredWarning
-from src.domain.models import AppState, ComicDTO, ComicState, SeriesDTO, SeriesState
+from src.domain.models import (AppState, ComicDTO, ComicState, CoverSource, SeriesDTO,
+                               SeriesState)
 from src.domain.sorting import natural_sort_key
 from src.infrastructure.fs_scanner import ScanResult
 from src.infrastructure.json_repository import JsonStateRepository
@@ -75,10 +76,26 @@ class LibraryService:
             total_count=len(comics),
             cover_path=cover_path if cover_path.exists() else None,
             comics=comics,
+            has_custom_cover=series.custom_cover_image is not None,
         )
+
+    def comic_path(self, series_name: str, comic_filename: str) -> Path:
+        self._comic_state(series_name, comic_filename)
+        return self.root_directory / series_name / comic_filename
 
     def cover_path(self, series_name: str) -> Path:
         return self._covers_dir / f"{series_name}.png"
+
+    def set_cover_reference(self, series_name: str, source: Optional[CoverSource]) -> None:
+        """Registra (ou limpa, com None) a capa customizada da série e persiste."""
+        series = self._series_state(series_name)
+        if source is None:
+            series.custom_cover_image = None
+        else:
+            series.custom_cover_image = str(PureWindowsPath(self._covers_dir.name,
+                                                            f"{series_name}.png"))
+        series.cover_source = source
+        self._repository.save(self._state)
 
     def series_without_cover(self) -> List[str]:
         return [name for name in sorted(self._disk, key=natural_sort_key)

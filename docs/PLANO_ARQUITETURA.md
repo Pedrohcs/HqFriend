@@ -233,13 +233,15 @@ sequenceDiagram
     User->>UI: Seleciona a HQ (ex: "Edicao_05.cbr")
     UI->>TW: Inicia ThumbnailWorker(comic_path)
 
+    TW->>Cov: iter_thumbnails(comic_path)
+    Cov->>Arch: open_archive(comic_path) (uma única vez)
     loop Para cada página (até isInterruptionRequested)
-        TW->>Cov: build_thumbnail(comic_path, page_index)
         Cov->>Arch: get_page_bytes(page_index)
         Arch-->>Cov: Bytes da Imagem (RAM)
-        Cov-->>TW: Thumbnail redimensionado (250px)
+        Cov-->>TW: (page_index, thumbnail 250px)
         TW-->>UI: Sinal page_thumbnail_ready(page_index, QImage)
     end
+    Note over TW,Cov: Interrupção: TW fecha o gerador, liberando o arquivo
 
     User->>UI: Passo 2: Clica na página desejada para ser a Capa
     UI->>Cov: set_custom_cover(series_name, comic_filename, page_index)

@@ -104,7 +104,7 @@ graph LR
 #### `FEAT-07` — Serviço de Gerenciamento e Cache de Capas das Séries
 * **Requisitos Atendidos:** RF11, RF12, RNF02, RNF05
 * **Arquivos Envolvidos:** `src/services/cover_service.py`
-* **Descrição Técnica:** Implementar, sem dependência de PySide6, a geração da capa padrão (página 0 da primeira HQ da série em ordem natural, pulando HQs inválidas) caso a série ainda não possua capa no cache `%DOCUMENTOS%\HqFriend\covers\{Serie}.png`; o método `set_custom_cover(series_name, comic_filename, page_index)` para sobrescrever a capa no cache e atualizar o `state.json`; o método `restore_default_cover(series_name)`; e `build_thumbnail(comic_path, page_index)` para uso pelo `ThumbnailWorker`.
+* **Descrição Técnica:** Implementar, sem dependência de PySide6, a geração da capa padrão (página 0 da primeira HQ da série em ordem natural, pulando HQs inválidas) caso a série ainda não possua capa no cache `%DOCUMENTOS%\HqFriend\covers\{Serie}.png`; o método `set_custom_cover(series_name, comic_filename, page_index)` para sobrescrever a capa no cache e atualizar o `state.json`; o método `restore_default_cover(series_name)`; e o gerador `iter_thumbnails(comic_path)` para uso pelo `ThumbnailWorker`, que abre a HQ uma única vez e produz `(page_index, miniatura)` página a página (evita reabrir — e, em CBR, reextrair — o arquivo a cada miniatura).
 * **Critérios de Aceite:**
     1. Toda série sincronizada que possua ao menos uma HQ válida deve possuir uma imagem `.png` otimizada salva em `covers\`.
     2. Ao definir uma capa customizada a partir de qualquer página de uma HQ da série, o arquivo em `covers\` e o `state.json` devem ser atualizados imediatamente, com `custom_cover_image` relativo a `%DOCUMENTOS%\HqFriend`.
@@ -131,7 +131,7 @@ graph LR
 * **Arquivos Envolvidos:** `src/ui/dialogs/cover_picker_dialog.py`, `src/ui/workers/thumbnail_worker.py`
 * **Descrição Técnica:** Implementar o diálogo modal acionado pelo menu de contexto da série:
     * **Passo 1:** `QComboBox` (ou lista seletora) onde o usuário escolhe qual arquivo `.cbr`/`.cbz` daquela série deseja pré-visualizar.
-    * **Passo 2:** `ThumbnailWorker` (subclasse de `QThread`) que chama `CoverService.build_thumbnail` para cada página apenas da HQ selecionada, emitindo `page_thumbnail_ready(page_index, QImage)` e preenchendo um grid visual de *thumbnails* de 250px para seleção da nova capa.
+    * **Passo 2:** `ThumbnailWorker` (subclasse de `QThread`) que consome `CoverService.iter_thumbnails` apenas para a HQ selecionada, verificando `isInterruptionRequested()` entre as páginas e fechando o gerador ao ser interrompido, emitindo `page_thumbnail_ready(page_index, QImage)` e preenchendo um grid visual de *thumbnails* de 250px para seleção da nova capa.
 * **Critérios de Aceite:**
     1. O sistema não deve extrair todas as HQs da série de uma vez; deve carregar apenas as páginas da HQ selecionada no Passo 1.
     2. A interface não deve travar durante o carregamento das miniaturas, e fechar o modal (ou trocar de HQ) antes do fim deve interromper a thread (`requestInterruption()` + `wait()`) sem vazamento de memória.

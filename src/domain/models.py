@@ -59,6 +59,7 @@ class SeriesDTO:
     total_count: int
     cover_path: Optional[Path]
     comics: Tuple[ComicDTO, ...] = ()
+    has_custom_cover: bool = False
 
     @property
     def counter_label(self) -> str:
