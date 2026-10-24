@@ -9,7 +9,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** Fase 2 concluída. Próxima feature: **`FEAT-06`** (Fase 3).
+**Etapa Atual:** Fase 3 em andamento. Próxima feature: **`FEAT-07`**.
 
 | ID | Fase | Feature | Requisitos / US | Status | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- |
@@ -18,8 +18,8 @@
 | **FEAT-03** | Fase 1 | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `concluida` | — |
 | **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `concluida` | — |
 | **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | Critério 6 (sem janela no `.exe`) será reconfirmado na FEAT-13 |
-| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `pendente` | Próxima feature (dependências concluídas) |
-| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Dependências concluídas |
+| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `concluida` | Gatilhos de atualização do RF19 (F5, retorno à Home) são integrados na FEAT-08/FEAT-10 |
+| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Próxima feature (dependências concluídas) |
 | **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `pendente` | Depende de FEAT-06 e FEAT-07 |
 | **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `pendente` | Depende de FEAT-07 e FEAT-08 |
 | **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `pendente` | Depende de FEAT-08 |
@@ -122,5 +122,16 @@
     * **Fixtures:** `tests/fixtures/build_fixtures.py` gera (via Pillow + `Rar.exe` do WinRAR) 14 arquivos de teste versionados: ZIP, RAR4, RAR5, RAR5 *solid*, ZIP renomeado para `.cbr`, RAR renomeado para `.cbz`, sem imagens, com senha (arquivo e cabeçalho), ZIP/RAR truncados, arquivo vazio e texto renomeado.
     * Suíte de testes: **95 testes passando** (43 novos da FEAT-05), cobrindo os critérios de aceite 1 a 5; o critério 6 é coberto pela verificação de `CREATE_NO_WINDOW` no processo e será reconfirmado no executável (FEAT-13).
     * `FEAT-05` $\rightarrow$ `concluida`. `FEAT-06` e `FEAT-07` passam a ter todas as dependências concluídas.
+
+### [Registro #011] — 2026-10-24 — FEAT-06 Concluída
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 3 em andamento. Próxima feature: **`FEAT-07`**.
+* **Resumo das Mudanças:**
+    * **FEAT-06:** implementado `src/services/library_service.py`:
+        * `compute_series_status()`: regra do RF09 (`READ` se todas as HQs do disco estão lidas; `UNREAD` se nenhuma está lida nem em andamento; senão `IN_PROGRESS`).
+        * `LibraryService`: `load_state()`, `set_root_directory()` (mantém o progresso — QA-01), `apply_scan()` (mescla o `ScanResult`, cria entradas novas, recalcula status e persiste), `list_series()` / `get_series()` (DTOs com contador `X / Y obras`, em ordem natural — RF18), `cover_path()` / `series_without_cover()` (insumo do `CoverWorker`), `mark_comic_read/unread()` e `mark_series_read/unread()` (marcar como não lida zera o bookmark — RF08/RF10) e `recalculate_series_status()`.
+        * Entradas órfãs permanecem no `state.json`, mas ficam fora dos contadores e listagens (ADR-03); progresso é recuperado se o arquivo voltar ao disco. Séries sem HQs são descartadas.
+    * Suíte de testes: **115 testes passando** (20 novos da FEAT-06), cobrindo os 7 critérios de aceite.
+    * `FEAT-06` $\rightarrow$ `concluida`. Os gatilhos de atualização do RF19 (F5, botão "Atualizar", retorno à Home) dependem da UI e serão ligados na FEAT-08/FEAT-10.
 
 <!-- ADICIONE NOVOS REGISTROS ABAIXO DESTA LINHA (NÃO EDITE OS REGISTROS ACIMA) -->
