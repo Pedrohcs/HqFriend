@@ -228,7 +228,8 @@ class AppState(BaseModel):
     2. Executa **um único** processo `UnRAR.exe p -inul -p- <arquivo>`, que escreve no `stdout` o conteúdo de todos os arquivos em sequência, na ordem física do arquivo. A opção `-p-` impede que o processo aguarde senha.
     3. Fatia o fluxo de `stdout` usando os `file_size` das entradas (ignorando diretórios), montando um `dict[entry_name, bytes]` mantido em RAM durante a sessão de leitura; em seguida aplica o filtro de imagens e a ordenação natural.
     4. Valida que o total de bytes recebidos é igual à soma dos tamanhos; divergência ou código de saída diferente de `0` resulta em `InvalidComicError`.
-    * *Supressão de Janela de Console:* a chamada `subprocess.run(...)` usa `creationflags=subprocess.CREATE_NO_WINDOW`. Para as chamadas internas do `rarfile` (listagem), verificar na implementação se a versão utilizada já aplica a flag no Windows; caso contrário, sobrescrever `rarfile.custom_popen` (ver seção 6, item 1).
+    * *Supressão de Janela de Console:* a chamada `subprocess.run(...)` usa `creationflags=subprocess.CREATE_NO_WINDOW`. As chamadas internas do `rarfile` (listagem) já aplicam a flag no Windows (confirmado no `rarfile==4.2` — `rarfile.custom_popen`), dispensando sobrescrita.
+    * *Arquivo protegido por senha:* com `-p-`, o `UnRAR.exe` retorna imediatamente com código `11` (senha incorreta) sem aguardar entrada, o que resulta em `InvalidComicError`. Com cabeçalhos criptografados, a listagem do `rarfile` pode retornar sem entradas, também resultando em `InvalidComicError` (sem imagens).
     * *Teste obrigatório:* fixtures com RAR4, RAR5 e RAR *solid*, validando que os bytes fatiados correspondem aos de `rf.read(entry)`.
 * **Arquivo Inválido (RF20):** arquivos que não sejam ZIP/RAR válidos, protegidos por senha, corrompidos ou sem nenhuma imagem após o filtro lançam `InvalidComicError` (definida em `src/domain/errors.py`).
 
@@ -444,7 +445,7 @@ coll = COLLECT(
 1. **Supressão de Janela de Console no `UnRAR.exe` (Windows GUI Mode):**
    Quando uma aplicação PySide6 roda com `console=False` no PyInstaller, chamadas de `subprocess` sem a flag adequada fazem o Windows abrir e fechar rapidamente uma janela preta do `cmd.exe`.
     * *Extração (passada única):* a chamada própria a `subprocess.run` usa `creationflags=subprocess.CREATE_NO_WINDOW` (`0x08000000`).
-    * *Listagem via `rarfile`:* verificar se a versão utilizada já aplica a flag no Windows; caso contrário, sobrescrever `rarfile.custom_popen` injetando `creationflags=subprocess.CREATE_NO_WINDOW`. Critério de aceite da FEAT-05 cobre o teste no executável.
+    * *Listagem via `rarfile`:* o `rarfile==4.2` já injeta `CREATE_NO_WINDOW` em `rarfile.custom_popen` no Windows (verificado em 2026-10-24). Ao atualizar a versão do `rarfile`, reconfirmar. Critério de aceite da FEAT-05 cobre o teste no executável.
 2. **Interrupção do `ThumbnailWorker` na Galeria de Capas (`CoverPickerDialog`):**
    Se o usuário abrir uma HQ com 150 páginas no seletor de capas e fechar o modal (ou trocar de HQ) antes do `ThumbnailWorker` terminar, o diálogo chama `worker.requestInterruption()` e `worker.wait()` no `closeEvent`. O worker (subclasse de `QThread`) verifica `isInterruptionRequested()` entre cada página, encerra o laço e libera o arquivo `.cbr`/`.cbz`.
 3. **Arquivos `.cbr`/`.cbz` com Imagens WebP ou Corrompidas:**

@@ -9,17 +9,17 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** Fase 1 concluída. Próxima feature: **`FEAT-04`** (Fase 2).
+**Etapa Atual:** Fase 2 concluída. Próxima feature: **`FEAT-06`** (Fase 3).
 
 | ID | Fase | Feature | Requisitos / US | Status | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- |
 | **FEAT-01** | Fase 1 | Setup do Projeto, Configuração de Caminhos, Logs e Bootstrap de Pastas | RNF01, RNF02, RNF03, RNF06 | `concluida` | Validada em Python 3.12.10 |
 | **FEAT-02** | Fase 1 | Modelagem de Domínio e Schemas com Pydantic v2 | RNF02, RF18, US12 | `concluida` | — |
 | **FEAT-03** | Fase 1 | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `concluida` | — |
-| **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `pendente` | Próxima feature (dependências concluídas) |
-| **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `pendente` | Requer `bin/UnRAR.exe` |
-| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `pendente` | Depende de FEAT-04 |
-| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Depende de FEAT-05 |
+| **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `concluida` | — |
+| **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | Critério 6 (sem janela no `.exe`) será reconfirmado na FEAT-13 |
+| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `pendente` | Próxima feature (dependências concluídas) |
+| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `pendente` | Dependências concluídas |
 | **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `pendente` | Depende de FEAT-06 e FEAT-07 |
 | **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `pendente` | Depende de FEAT-07 e FEAT-08 |
 | **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `pendente` | Depende de FEAT-08 |
@@ -88,5 +88,39 @@
         * `load()`: cria e retorna estado limpo na primeira abertura; gera o snapshot `state.json.bak` a cada carga válida; em `state.json` inválido (JSON malformado, vazio, bytes inválidos ou schema inválido), preserva o arquivo como `state.corrupt-<AAAAMMDD-HHMMSS>.json`, restaura do `.bak` ou inicia limpo, retornando `StateRecoveredWarning` em `LoadResult.recovery_warning`.
     * Suíte de testes: **45 testes passando** (13 novos da FEAT-03), cobrindo os 5 critérios de aceite.
     * `FEAT-03` $\rightarrow$ `concluida`.
+
+### [Registro #008] — 2026-10-24 — FEAT-04 Concluída
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 2 em andamento. Próxima feature: **`FEAT-05`** (requer `bin/UnRAR.exe`).
+* **Resumo das Mudanças:**
+    * **FEAT-04:** adicionado `scan_series_folders(root_directory)` e o tipo `ScanResult` em `src/infrastructure/fs_scanner.py`. Mapeia apenas subpastas imediatas como séries e lista somente arquivos `.cbr`/`.cbz` (extensão sem distinção de maiúsculas) no 1º nível, em ordem natural. Ignora arquivos soltos na raiz, outras extensões, subpastas aninhadas, pastas com nome terminado em `.cbz`/`.cbr` e séries sem HQs. Raiz inexistente, inacessível ou que seja arquivo retorna resultado vazio; pasta de série inacessível é ignorada e registrada em log, sem afetar as demais.
+    * Suíte de testes: **52 testes passando** (7 novos da FEAT-04), cobrindo os 3 critérios de aceite.
+    * `FEAT-04` $\rightarrow$ `concluida`. A `FEAT-06` passa a ter todas as dependências concluídas.
+
+### [Registro #009] — 2026-10-24 — Binário `bin/UnRAR.exe` Adicionado e Validado
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 2 em andamento. Próxima feature: **`FEAT-05`** (sem bloqueios).
+* **Resumo das Mudanças:**
+    * `bin/UnRAR.exe` (**UNRAR 6.11 x64 freeware**) copiado da instalação local do WinRAR (`C:\Program Files\WinRAR\UnRAR.exe`); placeholder `bin/.gitkeep` removido. O binário não é ignorado pelo `.gitignore` e será versionado.
+    * Validação técnica (Python 3.12 / `rarfile==4.2`):
+        * `config.UNRAR_BINARY_PATH` resolve para `bin/UnRAR.exe` e o binário é reconhecido pelo `rarfile`.
+        * Extração em passada única (`UnRAR.exe p -inul -p-` + fatiamento por `file_size`) produz bytes idênticos a `rarfile.read()` em arquivos **RAR4**, **RAR5** e **RAR5 solid** — ADR-06 confirmado.
+        * Arquivo protegido por senha: retorno imediato com código `11`, sem travar aguardando senha.
+        * `rarfile.custom_popen` já aplica `CREATE_NO_WINDOW` — ressalva técnica resolvida e `PLANO_TECNICO.md` (3.3 e 6.1) atualizado.
+    * `Rar.exe` da instalação do WinRAR será usado para gerar as fixtures RAR dos testes da FEAT-05.
+
+### [Registro #010] — 2026-10-24 — FEAT-05 Concluída (Fase 2 Finalizada)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 2 concluída. Próxima feature: **`FEAT-06`** (Fase 3).
+* **Resumo das Mudanças:**
+    * **FEAT-05:** implementado `src/infrastructure/archive_reader.py`:
+        * `open_archive(path)`: detecta o formato real pelos *Magic Bytes* (`PK\x03\x04` / `PK\x05\x06` para ZIP; `Rar!\x1a\x07` para RAR), independentemente da extensão.
+        * `IComicArchive`: interface comum com `page_count`, `list_sorted_pages()` e `get_page_bytes(index)`; filtra apenas `.jpg`/`.jpeg`/`.png`/`.webp`, descarta `__MACOSX` e arquivos ocultos (`._*`) e aplica ordenação natural.
+        * `ZipArchiveStrategy`: leitura sob demanda com um `ZipFile` por thread; rejeita ZIP protegido por senha.
+        * `RarArchiveStrategy`: lista via `rarfile` e extrai tudo para a RAM em **um único** processo `UnRAR.exe p -inul -p- --` (com `CREATE_NO_WINDOW`), validando código de saída e total de bytes; rejeita RAR protegido por senha.
+        * Arquivos inexistentes, vazios, corrompidos, protegidos por senha, sem imagens ou de formato desconhecido lançam `InvalidComicError` (RF20).
+    * **Fixtures:** `tests/fixtures/build_fixtures.py` gera (via Pillow + `Rar.exe` do WinRAR) 14 arquivos de teste versionados: ZIP, RAR4, RAR5, RAR5 *solid*, ZIP renomeado para `.cbr`, RAR renomeado para `.cbz`, sem imagens, com senha (arquivo e cabeçalho), ZIP/RAR truncados, arquivo vazio e texto renomeado.
+    * Suíte de testes: **95 testes passando** (43 novos da FEAT-05), cobrindo os critérios de aceite 1 a 5; o critério 6 é coberto pela verificação de `CREATE_NO_WINDOW` no processo e será reconfirmado no executável (FEAT-13).
+    * `FEAT-05` $\rightarrow$ `concluida`. `FEAT-06` e `FEAT-07` passam a ter todas as dependências concluídas.
 
 <!-- ADICIONE NOVOS REGISTROS ABAIXO DESTA LINHA (NÃO EDITE OS REGISTROS ACIMA) -->
