@@ -1,4 +1,5 @@
 """Sincronização disco vs state.json, contadores X/Y, status das séries e marcações (RF04-RF10, RF18)."""
+from datetime import datetime
 from pathlib import Path, PureWindowsPath
 from typing import Iterable, List, Optional
 
@@ -86,6 +87,9 @@ class LibraryService:
     def cover_path(self, series_name: str) -> Path:
         return self._covers_dir / f"{series_name}.png"
 
+    def cover_source(self, series_name: str) -> Optional[CoverSource]:
+        return self._series_state(series_name).cover_source
+
     def set_cover_reference(self, series_name: str, source: Optional[CoverSource]) -> None:
         """Registra (ou limpa, com None) a capa customizada da série e persiste."""
         series = self._series_state(series_name)
@@ -100,6 +104,30 @@ class LibraryService:
     def series_without_cover(self) -> List[str]:
         return [name for name in sorted(self._disk, key=natural_sort_key)
                 if not self.cover_path(name).exists()]
+
+    @property
+    def double_page_mode(self) -> bool:
+        return self._state.reader_preferences.double_page_mode
+
+    def set_double_page_mode(self, enabled: bool) -> None:
+        self._state.reader_preferences.double_page_mode = enabled
+        self._repository.save(self._state)
+
+    def comic_state(self, series_name: str, comic_filename: str) -> ComicState:
+        """Cópia do estado da HQ (alterações devem passar pelos métodos do serviço)."""
+        return self._comic_state(series_name, comic_filename).model_copy()
+
+    def update_reading_progress(self, series_name: str, comic_filename: str, current_page: int,
+                                total_pages: int) -> None:
+        """Atualiza o bookmark apenas em memória; persistir com `save()` (gravação agrupada)."""
+        comic = self._comic_state(series_name, comic_filename)
+        comic.current_page = current_page
+        comic.total_pages = total_pages
+        comic.last_read_at = datetime.now()
+        self.recalculate_series_status(series_name)
+
+    def save(self) -> None:
+        self._repository.save(self._state)
 
     def mark_comic_read(self, series_name: str, comic_filename: str) -> SeriesDTO:
         self._comic_state(series_name, comic_filename).is_read = True

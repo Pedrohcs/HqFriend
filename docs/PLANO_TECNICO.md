@@ -331,6 +331,7 @@ Atende integralmente ao **RF17** e às validações técnicas de sanitização, 
       combined.save(output_path, format="PNG")
       ```
     * **Em Modo Página Dupla com página final isolada (ADR-02):** exporta como página única.
+5. **Execução em Segundo Plano:** a gravação de um PNG de página dupla em resolução original pode levar alguns segundos (medido: ~2,8 s para 3976×3056 px). O `ReaderView` captura os bytes das páginas visíveis e delega a exportação a um `ExportWorker` (`QThread`); o *toast* é exibido ao término. A escolha do nome livre e a gravação são serializadas por um `threading.Lock` no `ExportService`, garantindo que `Ctrl + P` repetidos nunca gerem o mesmo nome. Ao fechar o aplicativo, as exportações em andamento são aguardadas.
 
 ---
 

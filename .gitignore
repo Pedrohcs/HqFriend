@@ -1,7 +1,19 @@
-.idea/
+# Ambiente e cache do Python
 .venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Saídas do PyInstaller (o HqFriend.spec é versionado)
 build/
 dist/
+
+# IDEs / editores
+.idea/
+.vscode/
+
+# Arquivos criados pelo Windows Explorer
+Thumbs.db
+desktop.ini

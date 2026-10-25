@@ -9,7 +9,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** Fase 3 concluída. Próxima feature: **`FEAT-08`** (Fase 4 — início da interface gráfica).
+**Etapa Atual:** ✅ Projeto concluído — todas as 13 features entregues e validadas (executável validado pelo usuário).
 
 | ID | Fase | Feature | Requisitos / US | Status | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- |
@@ -17,15 +17,15 @@
 | **FEAT-02** | Fase 1 | Modelagem de Domínio e Schemas com Pydantic v2 | RNF02, RF18, US12 | `concluida` | — |
 | **FEAT-03** | Fase 1 | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `concluida` | — |
 | **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `concluida` | — |
-| **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | Critério 6 (sem janela no `.exe`) será reconfirmado na FEAT-13 |
+| **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | — |
 | **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `concluida` | Gatilhos de atualização do RF19 (F5, retorno à Home) são integrados na FEAT-08/FEAT-10 |
 | **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `concluida` | — |
-| **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `pendente` | Próxima feature (dependências concluídas) |
-| **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `pendente` | Depende de FEAT-07 e FEAT-08 |
-| **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `pendente` | Depende de FEAT-08 |
-| **FEAT-11** | Fase 5 | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `pendente` | Depende de FEAT-05, FEAT-06 e FEAT-10 |
-| **FEAT-12** | Fase 5 | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `pendente` | Depende de FEAT-11 |
-| **FEAT-13** | Fase 5 | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `pendente` | Depende de todas as anteriores |
+| **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `concluida` | — |
+| **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `concluida` | — |
+| **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `concluida` | — |
+| **FEAT-11** | Fase 5 | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
+| **FEAT-12** | Fase 5 | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
+| **FEAT-13** | Fase 5 | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | Executável validado pelo usuário |
 
 ---
 
@@ -147,5 +147,95 @@
     * **Ajuste de spec:** `build_thumbnail(comic_path, page_index)` substituído por `iter_thumbnails(comic_path)` em `PLANO_ARQUITETURA.md` (4.2) e `PLANO_DESENVOLVIMENTO.md` (FEAT-07 e FEAT-09). Motivo: chamar por página reabriria a HQ a cada miniatura e, em CBR, reextrairia o arquivo inteiro (custo O(n²), contrariando a ADR-06).
     * Suíte de testes: **129 testes passando** (14 novos da FEAT-07), cobrindo os 4 critérios de aceite — incluindo verificação, em subprocesso, de que domínio, serviços e infraestrutura não importam PySide6.
     * `FEAT-07` $\rightarrow$ `concluida`.
+
+### [Registro #013] — 2026-10-24 — FEAT-08 Concluída (Primeira Interface Gráfica)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 4 em andamento. Próxima feature: **`FEAT-09`**.
+* **Resumo das Mudanças:**
+    * **FEAT-08:** implementados:
+        * `src/main.py`: inicialização (pastas, log, `QApplication` com estilo Fusion e ícone, `UnhandledErrorReporter` ligado ao excepthook, trava de instância única via `QLockFile` com detecção de processo morto, tema, carga do estado com aviso de recuperação, janela maximizada e primeira varredura). Executável também via `python src/main.py`.
+        * `src/ui/main_window.py`: `MainWindow` com `QStackedWidget`; encerra os workers ao fechar.
+        * `src/ui/views/home_view.py`: `HomeView` com cabeçalho (pasta raiz com caminho completo no tooltip, status da varredura, "Selecionar pasta", "Atualizar" / `F5`), estados vazios (sem pasta, pasta não encontrada preservando o estado, pasta sem séries), grid responsivo de `SeriesCard` (capa ou placeholder, título, badge colorido por status, contador `X / Y obras`) e menu de contexto ("Selecionar imagem de capa" — desabilitada até a FEAT-09 —, "Restaurar capa padrão" quando há capa customizada, "Marcar como lida" / "Marcar como não lida" habilitadas conforme o status). Varredura solicitada durante outra é enfileirada uma única vez; resultado de raiz antiga é descartado.
+        * `src/ui/workers/library_scan_worker.py` e `cover_worker.py`: `QThread`s de varredura e de geração progressiva de capas.
+        * `src/ui/error_dialog.py`: exibição de exceções não tratadas de qualquer thread, uma por vez (RNF06).
+        * `assets/styles/dark_theme.qss` (tema escuro `#121212`, destaque âmbar) e `assets/icon.ico` (gerado com Pillow).
+    * **Bugs encontrados e corrigidos na validação visual:** grid calculava as colunas com a área de rolagem ainda oculta (agora recalcula no redimensionamento do *viewport*); caminho longo da raiz impunha largura mínima à janela e era cortado no cabeçalho.
+    * **Infraestrutura de testes de UI:** `tests/ui/` em modo `offscreen` com fontes do Windows (`QT_QPA_FONTDIR`); `SignalRecorder` substitui `QSignalSpy.wait()`, que no PySide6 mantém o GIL e impede a execução de workers Python.
+    * **Verificações:** 145 testes passando (16 novos de UI); *smoke test* do `main()` real (código de saída 0, pastas criadas, trava liberada, log sem erros); biblioteca simulada com 150 séries: grid pronto em 140 ms, 150 capas geradas em segundo plano em 8 s, maior bloqueio da UI de 123 ms.
+    * `FEAT-08` $\rightarrow$ `concluida`. `FEAT-09` e `FEAT-10` passam a ter todas as dependências concluídas.
+
+### [Registro #014] — 2026-10-24 — FEAT-09 Concluída
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 4 em andamento. Próxima feature: **`FEAT-10`**.
+* **Resumo das Mudanças:**
+    * **FEAT-09:** implementados:
+        * `src/ui/workers/thumbnail_worker.py`: `ThumbnailWorker` (`QThread`) que consome `CoverService.iter_thumbnails`, converte cada miniatura para `QImage` (cópia própria dos dados) e verifica `isInterruptionRequested()` entre as páginas; fecha o gerador ao terminar, liberando o arquivo; emite `failed` para HQ inválida.
+        * `src/ui/dialogs/cover_picker_dialog.py`: `CoverPickerDialog` modal em 2 etapas — Passo 1: `QComboBox` com as HQs da série em ordem natural (pré-seleciona a HQ da capa atual, ou a primeira); Passo 2: grid de miniaturas (`QListWidget` em `IconMode`) preenchido progressivamente, com "Definir como capa" habilitado apenas com página selecionada (ou duplo clique). Trocar de HQ não bloqueia a UI: o worker anterior é interrompido e suas miniaturas são descartadas por um contador de geração. Fechar/cancelar interrompe e aguarda os workers.
+        * `MainWindow.open_cover_picker()`: liga a opção "Selecionar imagem de capa" (agora habilitada) e atualiza o card da série ao confirmar.
+        * `LibraryService.cover_source()`; estilos do diálogo no `dark_theme.qss` (seleção destacada por borda âmbar, sem tinta sobre a miniatura).
+    * Suíte de testes: **155 testes passando** (10 novos da FEAT-09), cobrindo os 3 critérios de aceite: só a HQ selecionada é extraída (e fora da thread principal); fechar durante o carregamento interrompe a thread e libera o arquivo (verificado apagando a HQ em seguida); confirmar atualiza a capa e o card na Tela Inicial.
+    * `FEAT-09` $\rightarrow$ `concluida`.
+
+### [Registro #015] — 2026-10-24 — FEAT-10 Concluída (Fase 4 Finalizada)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 4 concluída. Próxima feature: **`FEAT-11`** (Fase 5 — leitor).
+* **Resumo das Mudanças:**
+    * **FEAT-10:** implementados:
+        * `src/ui/views/series_view.py`: `SeriesView` com cabeçalho ("← Voltar" / `Esc`, nome da série, badge de status e contador `X / Y obras`), lista de HQs em ordem natural com status colorido (`Não lida`, `Em andamento – Pág. X/Y`, `Lida`), menu de contexto "Marcar como lida" / "Marcar como não lida" (recalcula o status da série e remove a indicação de andamento ao desmarcar) e duplo clique emitindo `comic_open_requested`.
+        * `MainWindow`: navegação Home $\rightarrow$ Série (clique no card) e Série $\rightarrow$ Home (com nova varredura — RF19); `open_comic()` valida a HQ e exibe mensagem de erro para arquivo inválido, permanecendo na Tela da Série sem alterar o status (RF20). A abertura do leitor para HQs válidas será ligada na FEAT-11.
+        * Estilos da Tela da Série no `dark_theme.qss`.
+    * **Bugs encontrados e corrigidos pelos testes:**
+        * "← Voltar" e `Esc` não funcionavam: no PySide6, passar um sinal como `clicked=`/`activated=` no construtor não o conecta, e `clicked` envia o argumento `checked` que o sinal sem parâmetros rejeita.
+        * Encerramento podia abortar o processo: ao terminar, o worker de capas iniciava uma geração pendente durante o `shutdown()`, e a janela era destruída com a `QThread` ativa. `HomeView.shutdown()` agora bloqueia novas varreduras/gerações.
+    * Suíte de testes: **171 testes passando** (16 novos: 15 da FEAT-10 + 1 de regressão do encerramento), cobrindo os 3 critérios de aceite (o 2º parcialmente: o duplo clique emite a solicitação de abertura; a transição para o leitor é concluída na FEAT-11).
+    * `FEAT-10` $\rightarrow$ `concluida`. `FEAT-11` passa a ter todas as dependências concluídas.
+
+### [Registro #016] — 2026-10-24 — FEAT-11 Concluída (Leitor de HQs)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 5 em andamento. Próxima feature: **`FEAT-12`**.
+* **Resumo das Mudanças:**
+    * **FEAT-11:** implementados:
+        * `src/services/reader_service.py` (sem PySide6): `ReaderService` — abertura com validação (RF20), retomada do bookmark (HQ lida ou bookmark fora do intervalo reabre na página 1 — RF06), navegação com limites, pareamento em página dupla a partir da página 1 com alinhamento de índice ímpar e última página ímpar isolada (RF16, ADR-02), conclusão automática sempre que a última página fica visível — inclusive na abertura e no `Ctrl + S` (RF07), bookmark em memória com gravação agrupada (`flush`) e prefetch das próximas páginas em `ThreadPoolExecutor` com `PageCache` LRU thread-safe (ADR-04). `close()` grava o bookmark pendente e libera o arquivo.
+        * `src/ui/views/reader_view.py`: `ReaderView` (`QGraphicsView` com fundo preto) — renderização de 1 ou 2 páginas lado a lado centralizadas verticalmente, *Fit-to-View* a cada virada/alternância/redimensionamento, zoom `Ctrl + Scroll` ancorado no cursor (0,5x–5x, passo 1,15), arraste com o mouse apenas com zoom > 1x, teclado (`→`/`Espaço`, `←`, `Esc`, `Ctrl + S`) tratado em `keyPressEvent` antes da rolagem padrão, fallback de decodificação via Pillow e placeholder "Página ilegível", indicador de página sobreposto ("Pág. 3 / 24") e timer de 500 ms para gravar o bookmark.
+        * `MainWindow`: Série $\rightarrow$ Leitor no duplo clique (HQ inválida mantém a Tela da Série com mensagem), `Esc` volta à série atualizando os status, título da janela com o nome da HQ e gravação do bookmark ao fechar o app durante a leitura.
+        * `LibraryService`: `double_page_mode` / `set_double_page_mode()`, `comic_state()`, `update_reading_progress()` (em memória) e `save()`.
+    * **Desvios menores da spec:** `Ctrl + S` tratado no `keyPressEvent` do leitor em vez de `QShortcut` (mesmo efeito, testável); cache LRU com 6 páginas (par anterior, atual e próximo) em vez de 4, para cobrir o modo duplo; indicador de página adicionado.
+    * **Desempenho (RNF05):** páginas JPEG 1988×3056 de ~3 MB em janela 1920×1080 — virar página: média 69 ms / máx. 92 ms (página única) e máx. 133 ms (página dupla), em CBZ e CBR *solid*. Abertura: ~90–130 ms (CBZ) e ~0,5 s (CBR de 60 MB, extraído integralmente — ADR-06).
+    * Suíte de testes: **211 testes passando** (40 novos: 25 do `ReaderService` e 15 do `ReaderView`), cobrindo os 6 critérios de aceite.
+    * `FEAT-11` $\rightarrow$ `concluida`. Com o leitor, o critério 2 da FEAT-10 (transição para o leitor) foi concluído.
+
+### [Registro #017] — 2026-10-24 — FEAT-12 Concluída (Exportação Ctrl + P)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** Fase 5 em andamento. Próxima feature: **`FEAT-13`** (última).
+* **Resumo das Mudanças:**
+    * **FEAT-12:** implementados:
+        * `src/services/export_service.py` (sem PySide6): `sanitize_filename()` (remove `<>:"/\|?*`, caracteres de controle e pontos/espaços finais), `resolve_free_path()` (sufixos `_2`, `_3`, ... — nunca sobrescreve), `combine_side_by_side()` (une sem redimensionar, centralizando verticalmente em fundo preto) e `ExportService.export_pages()` (nome `NomeDaSerie_NomeDoArquivo_PagXX.png` com o número da primeira página visível, conversão obrigatória para RGB, criação da pasta, remoção de PNG incompleto em caso de erro e `threading.Lock` serializando nome + gravação).
+        * `src/ui/workers/export_worker.py`: `ExportWorker` (`QThread`) para gravar o PNG fora da thread principal.
+        * `ReaderView`: `Ctrl + P` exporta a(s) página(s) visível(is) na resolução original (ignorando o zoom), exibe *toast* "Página salva em Imagens\HQs" + nome do arquivo por 2 s (ou mensagem de falha) e aguarda exportações pendentes ao fechar o app.
+        * `MainWindow` aceita um `ExportService` injetável (testes usam pasta temporária; a pasta real `Imagens\HQs` não é tocada pelos testes).
+    * **Ajuste de spec:** `PLANO_TECNICO.md` (3.6, item 5) documenta a exportação em segundo plano — medido: PNG de página dupla 3976×3056 (15 MB) leva ~2,8 s para ser gravado; com o worker, a interface fica livre em ~1 ms.
+    * Suíte de testes: **232 testes passando** (21 novos: 16 do `ExportService` e 5 de UI), cobrindo os 3 critérios de aceite (página simples incluindo JPEG CMYK; página dupla unida, centralizada em fundo preto e nomeada pela primeira página; duas capturas sem sobrescrita).
+    * `FEAT-12` $\rightarrow$ `concluida`. `FEAT-13` passa a ter todas as dependências concluídas.
+
+### [Registro #018] — 2026-10-24 — FEAT-13 em Andamento (Executável Gerado)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-13` com build e verificações automáticas concluídos; aguardando validação manual do usuário.
+* **Resumo das Mudanças:**
+    * **FEAT-13:** criado `HqFriend.spec` (PyInstaller 6.11, modo onedir, `console=False`, `upx=False`, ícone `assets/icon.ico`, `bin/UnRAR.exe` e `assets/` embarcados) conforme `PLANO_TECNICO.md` (seção 5). Build: `.venv\Scripts\pyinstaller.exe --noconfirm --clean HqFriend.spec` (~26 s) $\rightarrow$ `dist\HqFriend\` (128 MB, 222 arquivos). Avisos do build apenas de importações opcionais (`tzdata`, `pkg_resources`).
+    * **Verificações automáticas do executável:**
+        * Cabeçalho PE: 64-bit, subsistema **GUI** (2) — o Windows não cria janela de console (critério 1).
+        * Ícone embutido no `HqFriend.exe` (extraído e conferido); `_internal\bin\UnRAR.exe`, `_internal\assets\` e plugins de imagem do Qt (`qjpeg`, `qwebp`) presentes no pacote.
+        * Execução do `.exe` (modo offscreen) com biblioteca de teste: varredura, geração de capas a partir de **CBR (RAR5 *solid*) via `UnRAR.exe` embarcado** e de CBZ, persistência no `state.json`, log em `Documentos\HqFriend\logs` (apenas o aviso esperado da HQ corrompida), trava de instância única criada. A pasta real `Documentos\HqFriend` foi salva antes e restaurada após o teste.
+    * **Validação manual pendente (usuário):** abrir `dist\HqFriend\HqFriend.exe` e confirmar: (1) nenhuma janela preta aparece ao abrir o app nem ao ler um `.cbr`; (2) leitura de um `.cbz` e de um `.cbr` reais; (3) `Ctrl + P` salva em `Imagens\HQs`. O item (1) também fecha o critério 6 da FEAT-05.
+    * `FEAT-13` $\rightarrow$ `em andamento`.
+
+### [Registro #019] — 2026-10-24 — FEAT-13 Concluída (Projeto Finalizado)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** ✅ Projeto concluído — todas as 13 features entregues e validadas.
+* **Resumo das Mudanças:**
+    * **Validação manual do executável** (`dist\HqFriend\HqFriend.exe`) confirmada pelo usuário: nenhuma janela de console ao abrir o app nem ao ler `.cbr`, leitura de `.cbz` e `.cbr` reais e `Ctrl + P` salvando em `Imagens\HQs`. Com isso, também foi fechado o critério 6 da FEAT-05.
+    * **`.gitignore` revisado** antes do commit: confirmado que nenhum arquivo indevido está versionado (cache Python, `.venv`, `build/`, `dist/`, `.idea/`); adicionadas entradas preventivas (`.coverage`, `htmlcov/`, `.vscode/`, `Thumbs.db`, `desktop.ini`). O `HqFriend.spec`, os fixtures de teste e `bin/UnRAR.exe` permanecem versionados.
+    * **Resumo final:** 232 testes automatizados passando; executável onedir de 128 MB gerado em ~26 s.
+    * `FEAT-13` $\rightarrow$ `concluida`.
 
 <!-- ADICIONE NOVOS REGISTROS ABAIXO DESTA LINHA (NÃO EDITE OS REGISTROS ACIMA) -->
