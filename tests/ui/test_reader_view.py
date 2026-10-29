@@ -183,15 +183,40 @@ def test_scroll_sem_ctrl_nao_altera_zoom(window):
     assert reader.zoom_factor == 1.0
 
 
-def test_pagina_cabe_na_tela_ao_abrir(window):
-    reader = _open(window)
-
+def _assert_page_fits_view(reader):
     mapped = reader.mapFromScene(reader.sceneRect()).boundingRect()
     viewport = reader.viewport().rect()
     tolerance = 4  # fitInView reserva uma margem fixa de ~2px em cada lado
     assert mapped.width() <= viewport.width() and mapped.height() <= viewport.height()
     assert (mapped.height() >= viewport.height() - tolerance
             or mapped.width() >= viewport.width() - tolerance)
+
+
+def test_pagina_cabe_na_tela_ao_abrir(window):
+    reader = _open(window)
+
+    _assert_page_fits_view(reader)
+
+
+def test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela(window):
+    # FIX-01 / RF15-CA2
+    reader = _open(window)
+    _wheel(reader, 120)
+
+    _key(reader, Qt.Key_S, Qt.ControlModifier)  # alternar o modo desfaz o zoom
+    assert reader.zoom_factor == 1.0
+    _assert_page_fits_view(reader)
+
+    window.resize(900, 1000)  # sem zoom: a página acompanha o novo tamanho
+    QTest.qWait(50)
+    _assert_page_fits_view(reader)
+
+    _wheel(reader, 120)
+    zoomed_scale = _scale(reader)
+    window.resize(1280, 800)  # com zoom: o zoom escolhido é preservado
+    QTest.qWait(50)
+    assert reader.zoom_factor == pytest.approx(1.15)
+    assert _scale(reader) == pytest.approx(zoomed_scale)
 
 
 def test_botao_fechar_volta_para_a_serie(window, library):
@@ -353,7 +378,25 @@ def test_ctrl_p_em_pagina_unica_salva_png_e_mostra_aviso(export_window, export_d
     assert path.name == "Batman_Batman 1_Pag02.png"
     assert Image.open(path).size == (8, 12)  # resolução original da página, sem o zoom da tela
     assert reader.toast.isVisible()
-    assert "Página salva em Imagens\HQs" in reader.toast.text()
+    assert "Página salva em Imagens\\HQs" in reader.toast.text()
+
+
+def test_ctrl_p_com_falha_ao_gravar_mostra_aviso_de_falha(export_window, export_dir, monkeypatch):
+    # FIX-01 / RF17-CA4
+    from src.services.export_service import ExportService
+
+    def fail_to_write(*_args, **_kwargs):
+        raise OSError("disco cheio")
+
+    monkeypatch.setattr(ExportService, "export_pages", fail_to_write)
+    reader = _open(export_window)
+
+    _export(reader)
+
+    assert reader.toast.isVisible()
+    assert reader.toast.text() == "Não foi possível salvar a página"
+    assert not export_dir.exists() or not any(export_dir.iterdir())
+    assert reader.page_indicator.text() == "Pág. 1 / 4"  # a leitura continua normalmente
 
 
 def test_ctrl_p_em_pagina_dupla_salva_uma_imagem_unida(export_window, export_dir):

@@ -18,7 +18,8 @@ Funciona **100% offline**: não precisa de internet nem de servidor. O progresso
 - **Leitor integrado:**
   - página única ou dupla (pares 1–2, 3–4, …);
   - zoom no ponto do cursor e arrastar a página ampliada;
-  - indicador de página;
+  - indicador de página e botão "Fechar" (`✕`) no canto superior direito;
+  - páginas ilegíveis aparecem como um quadro "Página ilegível", sem interromper a leitura;
   - troca de página em menos de 200 ms, com as próximas páginas carregadas em segundo plano.
 - **Exportação de página (`Ctrl + P`):** salva a página, ou as duas páginas lado a lado, como PNG na resolução original, sem sobrescrever capturas anteriores.
 - **Robustez:**
@@ -167,7 +168,7 @@ graph TD
 | Leitor | `Ctrl + Scroll` | Zoom (0,5x a 5x) |
 | Leitor | Arrastar com o mouse | Mover a página ampliada |
 | Leitor | `Ctrl + P` | Salvar a página como PNG |
-| Leitor | `Esc` | Fechar a HQ |
+| Leitor | `Esc` ou botão `✕` | Fechar a HQ |
 
 ### Onde ficam os dados
 

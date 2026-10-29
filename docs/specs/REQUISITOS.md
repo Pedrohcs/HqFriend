@@ -189,11 +189,11 @@ Critérios de aceite:
 * **RF14-CA4:** Durante a leitura, um indicador sobreposto mostra a posição atual: `Pág. N / Total` no modo único e `Págs. N–M / Total` no modo duplo.
 
 #### RF15 — Controle de Zoom (`Ctrl + Scroll`)
-`Ativo` · Origem: v1.0 (FEAT-11)
+`Ativo` · Origem: v1.0 (FEAT-11), FIX-01
 
 O usuário deve poder ampliar (zoom in) ou reduzir (zoom out) o tamanho da página atual utilizando o atalho `Ctrl + Scroll do mouse`.
 * **RF15-CA1:** `Ctrl + Scroll` aplica zoom ancorado no cursor, limitado entre 0,5x e 5x; com zoom acima de 1x, a página pode ser arrastada com o mouse.
-* **RF15-CA2:** Virar a página, alternar o modo (`Ctrl + S`) ou redimensionar a janela restaura o ajuste à tela (*Fit-to-View*).
+* **RF15-CA2:** Virar a página ou alternar o modo (`Ctrl + S`) restaura o ajuste à tela (*Fit-to-View*). Ao redimensionar a janela, a página acompanha o novo tamanho se estiver ajustada à tela (zoom 1x); com zoom ampliado, o zoom escolhido é preservado.
 
 #### RF16 — Alternância de Modo de Página (`Ctrl + S`)
 `Ativo` · Origem: v1.0 (FEAT-11)
@@ -415,4 +415,101 @@ graph TD
 
 ## 7. Matriz de Rastreabilidade
 
-> Em construção no FIX-01 (Bloco 4, tarefa T11): liga cada critério `RFxx-CAn` / `RNFxx-CAn` à sua verificação (teste automatizado ou roteiro manual).
+> Liga cada critério de aceite à sua verificação. Ao criar ou alterar um critério, o pacote (FEAT/FIX) atualiza a linha correspondente na etapa de Sincronização.
+
+**Resumo (FIX-01, 2026-10-29):** 84 critérios — 74 automáticos, 6 automáticos com complemento manual, 4 manuais e 0 lacunas. Caminhos relativos a `tests/`. As 3 lacunas encontradas na montagem da matriz (RF15-CA2, RF17-CA4 e RNF06-CA2) foram cobertas por testes no próprio FIX-01. Uma **lacuna** é um critério sem teste nem roteiro que o cubra por inteiro; cada lacuna é resolvida criando o teste ou aceitando-a como manual, com registro no pacote.
+
+| Critério | Verificação | Teste(s) / roteiro |
+| :--- | :--- | :--- |
+| RF01-CA1 | Automática | `services/test_library_service.py::test_trocar_raiz_nao_apaga_progresso`<br>`ui/test_home_view.py::test_carrega_series_em_ordem_natural_com_contador_e_status` |
+| RF01-CA2 | Automática | `services/test_library_service.py::test_trocar_raiz_nao_apaga_progresso` |
+| RF02-CA1 | Automática + Manual | `ui/test_home_view.py::test_carrega_series_em_ordem_natural_com_contador_e_status`<br>Roteiro M1 (abertura pelo `main.py` com a raiz salva) |
+| RF02-CA2 | Automática | `ui/test_home_view.py::test_raiz_inexistente_convida_a_selecionar_pasta_sem_apagar_estado` |
+| RF02-CA3 | Automática | `ui/test_home_view.py::test_sem_raiz_configurada_convida_a_selecionar_pasta`<br>`ui/test_home_view.py::test_raiz_inexistente_convida_a_selecionar_pasta_sem_apagar_estado`<br>`ui/test_home_view.py::test_raiz_sem_series_mostra_mensagem` |
+| RF02-CA4 | Automática + Manual | `ui/test_home_view.py::test_cabecalho_exibe_a_raiz_com_caminho_completo_no_tooltip`<br>Roteiro M1 (janela maximizada) |
+| RF03-CA1 | Automática | `infrastructure/test_fs_scanner.py::test_ignora_subpastas_sem_hqs` |
+| RF03-CA2 | Automática | `infrastructure/test_fs_scanner.py::test_ignora_arquivos_da_raiz_outras_extensoes_e_subpastas_aninhadas`<br>`infrastructure/test_fs_scanner.py::test_pasta_com_extensao_de_hq_nao_e_contada_como_arquivo` |
+| RF03-CA3 | Automática | `infrastructure/test_fs_scanner.py::test_raiz_inexistente_retorna_resultado_vazio`<br>`infrastructure/test_fs_scanner.py::test_raiz_que_e_arquivo_retorna_resultado_vazio`<br>`infrastructure/test_fs_scanner.py::test_serie_inacessivel_e_ignorada_sem_afetar_as_demais` |
+| RF04-CA1 | Automática | `services/test_library_service.py::test_serie_nova_comeca_nao_lida_com_contador_zero`<br>`domain/test_models.py::test_contador_da_serie_usa_formato_x_de_y` |
+| RF04-CA2 | Automática | `services/test_library_service.py::test_arquivos_removidos_nao_inflam_contador_e_permanecem_no_json`<br>`services/test_library_service.py::test_arquivo_removido_que_volta_recupera_progresso` |
+| RF05-CA1 | Automática | `ui/test_series_view.py::test_lista_hqs_da_serie_em_ordem_natural_com_status`<br>`ui/test_series_view.py::test_texto_de_status_da_hq`<br>`ui/test_series_view.py::test_mostra_hq_em_andamento_com_pagina` |
+| RF18-CA1 | Automática | `domain/test_sorting.py::test_ordena_numeros_como_humanos_e_ignora_maiusculas` |
+| RF18-CA2 | Automática | `services/test_library_service.py::test_series_e_hqs_em_ordem_natural`<br>`domain/test_sorting.py::test_ordena_paginas_de_arquivo_compactado`<br>`infrastructure/test_archive_reader.py::test_lista_apenas_imagens_em_ordem_natural` |
+| RF19-CA1 | Automática | `ui/test_home_view.py::test_novo_arquivo_e_atualizacao_refletem_no_contador`<br>`ui/test_home_view.py::test_f5_esta_associado_a_atualizacao` |
+| RF19-CA2 | Automática | `ui/test_series_view.py::test_voltar_atualiza_a_tela_inicial` |
+| RF19-CA3 | Automática | `ui/test_home_view.py::test_atualizacao_durante_varredura_e_enfileirada_uma_vez` |
+| RF19-CA4 | Automática | `ui/test_home_view.py::test_varredura_em_andamento_e_indicada_no_cabecalho` |
+| RF06-CA1 | Automática | `services/test_reader_service.py::test_fechar_e_reabrir_retoma_da_pagina`<br>`ui/test_reader_view.py::test_esc_na_metade_e_reabrir_retoma_da_pagina`<br>`ui/test_reader_view.py::test_fechar_o_app_durante_a_leitura_grava_o_bookmark` |
+| RF06-CA2 | Automática | `services/test_reader_service.py::test_hq_lida_reabre_na_primeira_pagina`<br>`services/test_reader_service.py::test_ultimo_par_em_pagina_dupla_conclui_e_reabre_na_primeira_pagina`<br>`ui/test_reader_view.py::test_concluir_em_pagina_dupla_e_reabrir_inicia_na_primeira_pagina` |
+| RF06-CA3 | Automática | `services/test_reader_service.py::test_bookmark_fora_do_intervalo_reabre_na_primeira_pagina` |
+| RF06-CA4 | Automática | `services/test_reader_service.py::test_releitura_nao_desmarca_hq_lida`<br>`services/test_reader_service.py::test_hq_lida_reabre_na_primeira_pagina` |
+| RF06-CA5 | Automática | `ui/test_reader_view.py::test_viradas_seguidas_adiam_a_gravacao_do_bookmark`<br>`ui/test_reader_view.py::test_bookmark_e_gravado_apos_o_intervalo`<br>`services/test_reader_service.py::test_bookmark_so_e_gravado_no_flush`<br>`services/test_reader_service.py::test_fechar_grava_bookmark_pendente`<br>`services/test_reader_service.py::test_chegar_a_ultima_pagina_marca_hq_como_lida`<br>`ui/test_reader_view.py::test_fechar_o_app_durante_a_leitura_grava_o_bookmark` |
+| RF07-CA1 | Automática | `services/test_reader_service.py::test_chegar_a_ultima_pagina_marca_hq_como_lida`<br>`ui/test_reader_view.py::test_ultima_pagina_marca_hq_como_lida_e_atualiza_serie` |
+| RF07-CA2 | Automática | `services/test_reader_service.py::test_ctrl_s_exibindo_ultimo_par_conclui_a_hq`<br>`ui/test_reader_view.py::test_ctrl_s_exibindo_o_ultimo_par_conclui_a_hq` |
+| RF07-CA3 | Automática | `services/test_reader_service.py::test_hq_de_pagina_unica_e_concluida_na_abertura` |
+| RF07-CA4 | Automática | `services/test_reader_service.py::test_ultima_hq_pendente_conclui_a_serie`<br>`ui/test_series_view.py::test_marcar_todas_como_lidas_conclui_a_serie` |
+| RF08-CA1 | Automática | `ui/test_series_view.py::test_menu_marca_hq_como_lida_e_recalcula_serie`<br>`services/test_library_service.py::test_marcar_hq_como_lida_atualiza_contador_e_status` |
+| RF08-CA2 | Automática | `ui/test_series_view.py::test_marcar_como_nao_lida_remove_indicacao_de_andamento`<br>`services/test_library_service.py::test_desmarcar_hq_lida_com_bookmark_na_ultima_pagina_zera_bookmark` |
+| RF08-CA3 | Automática | `services/test_library_service.py::test_desmarcar_unica_hq_lida_volta_serie_para_nao_lida` |
+| RF09-CA1 | Automática | `services/test_library_service.py::test_serie_lida_volta_para_em_andamento_ao_receber_novo_arquivo` |
+| RF09-CA2 | Automática | `services/test_library_service.py::test_regra_de_status_da_serie`<br>`services/test_library_service.py::test_apply_scan_persiste_estado_e_status` |
+| RF10-CA1 | Automática | `services/test_library_service.py::test_marcar_serie_como_lida`<br>`ui/test_home_view.py::test_marcar_serie_como_lida_e_nao_lida_atualiza_card` |
+| RF10-CA2 | Automática | `services/test_library_service.py::test_marcar_serie_como_nao_lida_zera_bookmarks`<br>`ui/test_home_view.py::test_marcar_serie_como_lida_e_nao_lida_atualiza_card` |
+| RF10-CA3 | Automática | `ui/test_home_view.py::test_menu_de_contexto_habilita_acoes_conforme_status` |
+| RF11-CA1 | Automática | `services/test_cover_service.py::test_capa_padrao_e_pagina_zero_da_primeira_hq`<br>`services/test_cover_service.py::test_capa_e_reduzida_mantendo_proporcao`<br>`ui/test_home_view.py::test_capas_sao_geradas_e_serie_invalida_mostra_placeholder` |
+| RF11-CA2 | Automática | `services/test_cover_service.py::test_capa_padrao_pula_hq_invalida`<br>`services/test_cover_service.py::test_serie_sem_hq_valida_fica_sem_capa`<br>`ui/test_home_view.py::test_capas_sao_geradas_e_serie_invalida_mostra_placeholder` |
+| RF11-CA3 | Automática | `ui/test_home_view.py::test_menu_oferece_restaurar_capa_apenas_com_capa_customizada`<br>`services/test_cover_service.py::test_restaurar_capa_padrao` |
+| RF12-CA1 | Automática | `ui/test_cover_picker_dialog.py::test_lista_hqs_da_serie_e_carrega_apenas_a_selecionada` |
+| RF12-CA2 | Automática | `ui/test_cover_picker_dialog.py::test_miniaturas_sao_extraidas_fora_da_thread_principal`<br>`ui/test_cover_picker_dialog.py::test_fechar_durante_carregamento_interrompe_e_libera_arquivo`<br>`ui/test_cover_picker_dialog.py::test_trocar_de_hq_durante_carregamento_descarta_miniaturas_antigas`<br>`services/test_cover_service.py::test_interromper_miniaturas_libera_o_arquivo` |
+| RF12-CA3 | Automática | `services/test_cover_service.py::test_capa_customizada_atualiza_cache_e_estado`<br>`ui/test_cover_picker_dialog.py::test_confirmar_define_capa_da_serie`<br>`ui/test_cover_picker_dialog.py::test_menu_da_home_abre_seletor_e_atualiza_card` |
+| RF12-CA4 | Automática | `ui/test_cover_picker_dialog.py::test_reabrir_seletor_parte_da_hq_da_capa_atual`<br>`ui/test_cover_picker_dialog.py::test_botao_de_confirmar_exige_pagina_selecionada`<br>`ui/test_cover_picker_dialog.py::test_duplo_clique_na_miniatura_confirma_a_capa` |
+| RF13-CA1 | Automática | `ui/test_reader_view.py::test_duplo_clique_em_hq_valida_abre_o_leitor`<br>`ui/test_series_view.py::test_duplo_clique_solicita_abertura_da_hq` |
+| RF13-CA2 | Automática | `ui/test_reader_view.py::test_duplo_clique_em_hq_valida_abre_o_leitor`<br>`ui/test_reader_view.py::test_botao_fechar_volta_para_a_serie` |
+| RF20-CA1 | Automática | `infrastructure/test_archive_reader.py::test_arquivo_invalido_lanca_invalid_comic_error`<br>`services/test_reader_service.py::test_hq_invalida_nao_abre_e_nao_altera_estado` |
+| RF20-CA2 | Automática | `ui/test_series_view.py::test_hq_invalida_mostra_erro_e_permanece_na_serie`<br>`ui/test_series_view.py::test_hq_valida_nao_mostra_erro` |
+| RF21-CA1 | Automática | `ui/test_reader_view.py::test_pagina_ilegivel_mostra_quadro_substituto_e_leitura_continua`<br>`ui/test_reader_view.py::test_decode_page_usa_placeholder_para_bytes_invalidos` |
+| RF21-CA2 | Automática | `ui/test_reader_view.py::test_pagina_ilegivel_mostra_quadro_substituto_e_leitura_continua` |
+| RF21-CA3 | Automática | `ui/test_reader_view.py::test_pagina_ilegivel_mostra_quadro_substituto_e_leitura_continua` |
+| RF14-CA1 | Automática | `services/test_reader_service.py::test_navegacao_em_pagina_unica_respeita_limites`<br>`ui/test_reader_view.py::test_seta_esquerda_volta_e_limites_sao_respeitados`<br>`services/test_reader_service.py::test_pagina_dupla_pareia_a_partir_da_primeira_pagina` |
+| RF14-CA2 | Automática | `ui/test_reader_view.py::test_esc_na_metade_e_reabrir_retoma_da_pagina`<br>`ui/test_reader_view.py::test_ultima_pagina_marca_hq_como_lida_e_atualiza_serie` |
+| RF14-CA3 | Automática | `ui/test_reader_view.py::test_botao_fechar_volta_para_a_serie`<br>`ui/test_reader_view.py::test_botao_fechar_acompanha_o_redimensionamento` |
+| RF14-CA4 | Automática | `ui/test_reader_view.py::test_duplo_clique_em_hq_valida_abre_o_leitor`<br>`ui/test_reader_view.py::test_ctrl_s_alterna_pagina_dupla_lado_a_lado` |
+| RF15-CA1 | Automática | `ui/test_reader_view.py::test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta`<br>`ui/test_reader_view.py::test_zoom_fica_entre_os_limites`<br>`ui/test_reader_view.py::test_scroll_sem_ctrl_nao_altera_zoom` |
+| RF15-CA2 | Automática | `ui/test_reader_view.py::test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta`<br>`ui/test_reader_view.py::test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela` |
+| RF16-CA1 | Automática | `services/test_reader_service.py::test_pagina_dupla_pareia_a_partir_da_primeira_pagina`<br>`ui/test_reader_view.py::test_ctrl_s_alterna_pagina_dupla_lado_a_lado` |
+| RF16-CA2 | Automática | `services/test_reader_service.py::test_ativar_pagina_dupla_em_indice_impar_alinha_ao_par`<br>`services/test_reader_service.py::test_bookmark_impar_abre_alinhado_em_pagina_dupla` |
+| RF16-CA3 | Automática | `services/test_reader_service.py::test_pagina_dupla_pareia_a_partir_da_primeira_pagina` |
+| RF16-CA4 | Automática | `services/test_reader_service.py::test_preferencia_de_pagina_dupla_e_persistida` |
+| RF17-CA1 | Automática | `services/test_export_service.py::test_pagina_unica_exportada_em_resolucao_original`<br>`services/test_export_service.py::test_jpeg_cmyk_e_convertido_para_rgb`<br>`ui/test_reader_view.py::test_ctrl_p_em_pagina_unica_salva_png_e_mostra_aviso` |
+| RF17-CA2 | Automática | `services/test_export_service.py::test_pagina_dupla_unida_lado_a_lado_centralizada_em_fundo_preto`<br>`services/test_export_service.py::test_combinacao_preserva_tamanhos_originais`<br>`services/test_export_service.py::test_nome_base_usa_numero_humano_da_primeira_pagina`<br>`ui/test_reader_view.py::test_ctrl_p_em_pagina_dupla_salva_uma_imagem_unida` |
+| RF17-CA3 | Automática | `services/test_export_service.py::test_nao_sobrescreve_capturas_existentes`<br>`services/test_export_service.py::test_exportacoes_simultaneas_geram_arquivos_distintos`<br>`ui/test_reader_view.py::test_ctrl_p_duas_vezes_nao_sobrescreve` |
+| RF17-CA4 | Automática | `services/test_export_service.py::test_sanitiza_nomes_para_o_windows`<br>`ui/test_reader_view.py::test_ctrl_p_em_pagina_unica_salva_png_e_mostra_aviso`<br>`ui/test_reader_view.py::test_ctrl_p_com_falha_ao_gravar_mostra_aviso_de_falha` |
+| RNF01-CA1 | Manual | Roteiro M2 |
+| RNF01-CA2 | Manual | Roteiro M2 |
+| RNF02-CA1 | Automática | `infrastructure/test_json_repository.py::test_primeira_abertura_cria_e_retorna_estado_limpo`<br>`domain/test_models.py::test_appstate_vazio_gera_json_valido_com_padroes_seguros` |
+| RNF02-CA2 | Automática | `domain/test_models.py::test_desserializa_json_existente_com_tipos_datas_e_enums`<br>`domain/test_models.py::test_rejeita_valores_invalidos`<br>`domain/test_models.py::test_rejeita_json_malformado` |
+| RNF02-CA3 | Automática | `infrastructure/test_json_repository.py::test_save_e_atomico_e_nao_deixa_arquivo_temporario`<br>`infrastructure/test_json_repository.py::test_permission_error_transitorio_e_superado`<br>`infrastructure/test_json_repository.py::test_permission_error_persistente_propaga_e_remove_temporario` |
+| RNF02-CA4 | Automática | `infrastructure/test_json_repository.py::test_estado_corrompido_e_restaurado_do_backup`<br>`infrastructure/test_json_repository.py::test_estado_corrompido_sem_backup_retorna_estado_limpo`<br>`infrastructure/test_json_repository.py::test_estado_e_backup_corrompidos_retornam_estado_limpo`<br>`domain/test_errors.py::test_aviso_de_recuperacao_informa_a_origem` |
+| RNF03-CA1 | Automática | `infrastructure/test_fs_scanner.py::test_cria_pastas_inexistentes`<br>`infrastructure/test_fs_scanner.py::test_pastas_padrao_sao_as_quatro_pastas_do_sistema`<br>`services/test_export_service.py::test_cria_a_pasta_de_exportacao` |
+| RNF03-CA2 | Automática | `test_config.py::test_pastas_conhecidas_do_usuario_existem`<br>`test_config.py::test_pastas_do_sistema_derivam_das_pastas_conhecidas`<br>`test_config.py::test_codigo_nao_contem_caminho_de_usuario_fixo` |
+| RNF04-CA1 | Automática | `infrastructure/test_archive_reader.py::test_lista_apenas_imagens_em_ordem_natural`<br>`infrastructure/test_archive_reader.py::test_fixture_solid_e_realmente_solid` |
+| RNF04-CA2 | Automática | `infrastructure/test_archive_reader.py::test_nao_cria_arquivos_temporarios` |
+| RNF04-CA3 | Automática | `infrastructure/test_archive_reader.py::test_cbr_executa_um_unico_processo_sem_janela`<br>`infrastructure/test_archive_reader.py::test_extrai_bytes_identicos_e_imagens_validas` |
+| RNF04-CA4 | Automática | `infrastructure/test_archive_reader.py::test_detecta_formato_real_pelos_magic_bytes` |
+| RNF04-CA5 | Automática + Manual | `infrastructure/test_archive_reader.py::test_cbr_executa_um_unico_processo_sem_janela`<br>`test_config.py::test_resource_path_no_executavel_usa_meipass`<br>Roteiro M2 (`.cbr` no executável) |
+| RNF05-CA1 | Manual | Roteiro M3 (medição; referência v1.0: máx. 133 ms) |
+| RNF05-CA2 | Automática + Manual | `ui/test_home_view.py::test_varredura_ocorre_fora_da_thread_principal`<br>Roteiro M3 (biblioteca com 100+ séries) |
+| RNF05-CA3 | Automática | `services/test_cover_service.py::test_camadas_de_dominio_servicos_e_infraestrutura_nao_importam_pyside6` |
+| RNF06-CA1 | Automática | `infrastructure/test_logging_setup.py::test_excepthook_registra_excecao_e_aciona_callback`<br>`infrastructure/test_logging_setup.py::test_threading_excepthook_registra_excecao_e_aciona_callback`<br>`infrastructure/test_logging_setup.py::test_configure_grava_mensagens_no_arquivo_de_log`<br>`ui/test_error_dialog.py::test_excecao_nao_tratada_e_registrada_e_exibida_sem_encerrar` |
+| RNF06-CA2 | Automática | `ui/test_error_dialog.py::test_excecao_de_outra_thread_e_exibida_na_thread_principal`<br>`ui/test_error_dialog.py::test_erros_sao_exibidos_um_por_vez`<br>`ui/test_error_dialog.py::test_excecao_nao_tratada_e_registrada_e_exibida_sem_encerrar` |
+| RNF07-CA1 | Automática + Manual | `ui/test_home_view.py::test_segunda_instancia_nao_obtem_a_trava`<br>`ui/test_home_view.py::test_trava_de_processo_encerrado_nao_bloqueia_abertura`<br>Roteiro M2 (mensagem "O HqFriend já está aberto.") |
+| RNF08-CA1 | Manual | Roteiro M2 |
+| RNF08-CA2 | Automática + Manual | `ui/test_home_view.py::test_carrega_series_em_ordem_natural_com_contador_e_status` (status do badge)<br>Roteiro M2 (cores) |
+
+### 7.1. Roteiros de Verificação Manual
+
+| Roteiro | Onde | Passos | Critérios |
+| :--- | :--- | :--- | :--- |
+| **M1** | Código-fonte (`python -m src.main`) ou executável | Com uma raiz já configurada, abrir o aplicativo: a janela abre maximizada na Tela Inicial e carrega as séries da raiz salva. | RF02-CA1, RF02-CA4 |
+| **M2** | Executável `dist\HqFriend\HqFriend.exe` | (1) Abrir o app: sem janela de console, com o ícone e o tema escuro em telas, menus e diálogos; status "Lida" verde, "Em andamento" âmbar, "Não lida" cinza. (2) Ler um `.cbz` e um `.cbr` reais (nenhuma janela de console ao abrir o `.cbr`); usar o botão "Fechar". (3) `Ctrl + P` salva em `Imagens\HQs`. (4) Com o app aberto, abrir uma segunda instância: aviso "O HqFriend já está aberto." e a nova instância encerra. (5) Conferir `Documentos\HqFriend` (`state.json`, `covers\`, `logs\`). | RNF01-CA1, RNF01-CA2, RNF04-CA5, RNF07-CA1, RNF08-CA1, RNF08-CA2 |
+| **M3** | Executável, máquina de referência | (1) Virar páginas de HQ com páginas JPEG de ~3 MB em 1920×1080, em CBZ e CBR *solid*: menos de 200 ms por virada. (2) Biblioteca com 100+ séries: a interface continua respondendo durante a varredura e a geração de capas. | RNF05-CA1, RNF05-CA2 |

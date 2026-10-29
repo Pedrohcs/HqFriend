@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** em andamento — Bloco 3/4 concluído; aguardando revisão do usuário para o Bloco 4 (alvo v1.0.1).
+**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** em andamento — Bloco 4/4: T11 e T12 concluídas e lacunas de teste fechadas; aguardando a validação manual do executável (roteiro M2) para concluir (alvo v1.0.1).
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -27,7 +27,7 @@
 | **FEAT-11** | Fase 5 (v1.0) | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
 | **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
-| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `em andamento` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Blocos 1–3/4 ✅ (T1–T10b, T13) — aguardando revisão |
+| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `em andamento` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Blocos 1–3/4 ✅; Bloco 4: T11–T12 ✅, lacunas cobertas — aguardando validação manual do `.exe` |
 
 ---
 
@@ -313,3 +313,21 @@
     * `bin/UnRAR.exe` 6.11 $\rightarrow$ **7.23** (SHA-256 `0d371500…b234235`) e novo `bin/license.txt` (SHA-256 `48c3ebe5…4859d09`); `HqFriend.spec` embarca a licença em `_internal\bin\`.
     * **Verificação:** 43 testes de `test_archive_reader.py` e suíte completa (**240**) passando com o 7.23; build do executável conferido (`_internal\bin\UnRAR.exe` 7.23 + `license.txt`). Validação manual de `.cbr` no `.exe` fica no Bloco 4.
     * ADR-12 atualizada (versão, procedência, hashes, histórico e procedimento de atualização); TECNICO §1.4 e §5 e README atualizados. O `License.txt` da instalação do WinRAR **não** é usado (é o contrato do WinRAR).
+
+### [Registro #028] — 2026-10-29 — FIX-01: Bloco 4 — Matriz de Rastreabilidade e README
+* **Responsável:** Analista de Requisitos Sênior / Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 4/4; T11 e T12 concluídas. Faltam a validação manual do executável (roteiros M1–M3) e a decisão do usuário sobre 3 lacunas de teste; depois, o arquivamento do pacote.
+* **Resumo das Mudanças:**
+    * **T11 — `specs/REQUISITOS.md` §7:** matriz com os **84 critérios** de aceite — 71 automáticos, 6 automáticos com complemento manual, 4 manuais e 3 lacunas (RF15-CA2, RF17-CA4, RNF06-CA2) — e roteiros manuais M1 (inicialização), M2 (executável) e M3 (desempenho). Os IDs e os nomes de teste citados foram conferidos automaticamente contra a spec e a coleta do pytest.
+    * **T12 — `README.md`:** botão "Fechar" no leitor (funcionalidades e atalhos) e página ilegível.
+
+### [Registro #029] — 2026-10-29 — FIX-01: Lacunas de Teste Fechadas
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 4/4; falta apenas a validação manual do executável (roteiro M2) para concluir e arquivar o pacote.
+* **Resumo das Mudanças:**
+    * **Decisão do usuário:** criar os testes das 3 lacunas da matriz e corrigir o aviso do pytest.
+    * **Novos testes:** `test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela` (RF15-CA2), `test_ctrl_p_com_falha_ao_gravar_mostra_aviso_de_falha` (RF17-CA4) e `tests/ui/test_error_dialog.py` com 3 testes do `UnhandledErrorReporter` (RNF06-CA2: exibição na thread principal, um erro por vez e integração excepthook → log → mensagem).
+    * **RF15-CA2 corrigido:** ao redimensionar, a página só é reajustada à tela com zoom 1x; com zoom ampliado, o zoom é preservado (comportamento implementado, já descrito no TECNICO §4.2).
+    * Corrigido o `SyntaxWarning: invalid escape sequence '\H'` em `tests/ui/test_reader_view.py`.
+    * **Matriz:** 84 critérios — 74 automáticos, 6 automáticos com complemento manual, 4 manuais e **0 lacunas**.
+    * **245 testes passando**, sem avisos; `tests/ui` repetido 3 vezes sem falhas.
