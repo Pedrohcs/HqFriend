@@ -4,28 +4,29 @@
 > 1. A seção **`Quadro de Features`** contém a **única** tabela de features do projeto e deve ser **atualizada no próprio lugar** sempre que o status de uma ou mais features mudar.
 > 2. A seção **`Histórico de Atualizações`** é **append-only (somente adição)**: **NUNCA apague ou sobrescreva** registros anteriores. A cada mudança, adicione ao final um novo registro cronológico com data, responsável, etapa atual e resumo da mudança — **sem** repetir a tabela de features.
 > 3. **Status Permitidos:** `pendente` | `em andamento` | `concluida` | `bloqueada` | `cancelada`.
+> 4. **A partir da v1.0**, cada linha nova do quadro é um **pacote** (`FEAT-NN` ou `FIX-NN`) com pasta em `docs/changes/` (ou em `docs/archive/` depois de concluído); a coluna **Pacote** aponta para ela. Um pacote só fica `concluida` depois da etapa de **Sincronização** da spec (ver `docs/README.md`).
 
 ---
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ Projeto concluído — todas as 13 features entregues e validadas (executável validado pelo usuário).
+**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). Documentação reorganizada para manutenção contínua. Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-01`.
 
-| ID | Fase | Feature | Requisitos / US | Status | Observações / Bloqueios |
-| :--- | :--- | :--- | :--- | :---: | :--- |
-| **FEAT-01** | Fase 1 | Setup do Projeto, Configuração de Caminhos, Logs e Bootstrap de Pastas | RNF01, RNF02, RNF03, RNF06 | `concluida` | Validada em Python 3.12.10 |
-| **FEAT-02** | Fase 1 | Modelagem de Domínio e Schemas com Pydantic v2 | RNF02, RF18, US12 | `concluida` | — |
-| **FEAT-03** | Fase 1 | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `concluida` | — |
-| **FEAT-04** | Fase 2 | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `concluida` | — |
-| **FEAT-05** | Fase 2 | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | — |
-| **FEAT-06** | Fase 3 | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `concluida` | Gatilhos de atualização do RF19 (F5, retorno à Home) são integrados na FEAT-08/FEAT-10 |
-| **FEAT-07** | Fase 3 | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `concluida` | — |
-| **FEAT-08** | Fase 4 | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `concluida` | — |
-| **FEAT-09** | Fase 4 | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `concluida` | — |
-| **FEAT-10** | Fase 4 | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `concluida` | — |
-| **FEAT-11** | Fase 5 | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
-| **FEAT-12** | Fase 5 | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
-| **FEAT-13** | Fase 5 | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | Executável validado pelo usuário |
+| ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
+| :--- | :--- | :--- | :--- | :---: | :--- | :--- |
+| **FEAT-01** | Fase 1 (v1.0) | Setup do Projeto, Configuração de Caminhos, Logs e Bootstrap de Pastas | RNF01, RNF02, RNF03, RNF06 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Validada em Python 3.12.10 |
+| **FEAT-02** | Fase 1 (v1.0) | Modelagem de Domínio e Schemas com Pydantic v2 | RNF02, RF18, US12 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-03** | Fase 1 (v1.0) | Repositório de Estado JSON com Escrita Atômica, Backup e Recuperação | RNF02, US12 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-04** | Fase 2 (v1.0) | Scanner de Diretórios de Nível Único (`.cbr`/`.cbz`) | RF01, RF03 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-05** | Fase 2 (v1.0) | Motor de Leitura `.cbz`/`.cbr` em RAM (RAR em passada única) + Ordenação Natural | RNF04, RNF05, RF20, ADR-01, ADR-06 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-06** | Fase 3 (v1.0) | Serviço de Biblioteca, Contadores `X / Y`, Status Dinâmico e Marcações | RF04, RF05, RF08, RF09, RF10, RF18, RF19 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Gatilhos de atualização do RF19 (F5, retorno à Home) são integrados na FEAT-08/FEAT-10 |
+| **FEAT-07** | Fase 3 (v1.0) | Serviço de Gerenciamento e Cache de Capas (`%DOCUMENTOS%\HqFriend\covers`) | RF11, RF12, RNF02, RNF05 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-08** | Fase 4 (v1.0) | `MainWindow` (Dark Mode, Instância Única) e Tela Inicial de Séries (`HomeView`) | RF01, RF02, RF04, RF10, RF11, RF18, RF19, RNF06, RNF07 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-09** | Fase 4 (v1.0) | Modal de Seleção de Capa em 2 Etapas com Worker Assíncrono | RF11, RF12, RNF05, US04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-10** | Fase 4 (v1.0) | Tela de Detalhes da Série e Listagem de HQs (`SeriesView`) | RF05, RF08, RF13, RF18, RF19, RF20, US06 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | — |
+| **FEAT-11** | Fase 5 (v1.0) | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
+| **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
+| **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
 
 ---
 
@@ -239,3 +240,15 @@
     * `FEAT-13` $\rightarrow$ `concluida`.
 
 <!-- ADICIONE NOVOS REGISTROS ABAIXO DESTA LINHA (NÃO EDITE OS REGISTROS ACIMA) -->
+
+### [Registro #020] — 2026-10-29 — Reorganização das Specs para Manutenção Contínua (SDD)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** v1.0 entregue. Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-01`.
+* **Resumo das Mudanças:**
+    * **Nova estrutura de `docs/`:** spec vigente em `specs/` (`REQUISITOS.md`, `ARQUITETURA.md` — antigo `PLANO_ARQUITETURA.md` — e `TECNICO.md` — antigo `PLANO_TECNICO.md`); uma ADR por arquivo em `adr/`; pacotes de mudança em `changes/` com templates de FEAT (`spec.md`, `plan.md`, `tasks.md`) e FIX (`fix.md`); `PLANO_DESENVOLVIMENTO.md` arquivado em `archive/v1.0/`. Processo descrito em `docs/README.md`.
+    * **Critérios de aceite migrados para os requisitos:** cada RF/RNF passou a ter critérios próprios (`RFxx-CAn`), derivados dos critérios das FEAT-01 a FEAT-13, com status `Ativo` e origem.
+    * **Desvios da implementação levados à spec** (antes registrados só neste histórico): ADR-04 agora indica cache de **6** páginas (era 4); `TECNICO.md` §4.2 indica `Ctrl + S` / `Ctrl + P` tratados no `keyPressEvent` (não `QShortcut`), o indicador de página e o *Fit-to-View* ao redimensionar; `ExportWorker`, `error_dialog.py` e `tests/ui/` incluídos na arquitetura e na árvore de fontes.
+    * **Cópias de código removidas de `TECNICO.md`** (`config.py`, schemas Pydantic e `HqFriend.spec`), substituídas por regras e referências aos arquivos.
+    * **Nova política:** versionamento e migração do `state.json` (`ARQUITETURA.md` §3.3), a ser implementada na primeira mudança de schema.
+    * Quadro de features ganhou as colunas **Fase / Versão** e **Pacote**. `CLAUDE.md` e `.github/pull_request_template.md` criados com o processo e o checklist de PR.
+
