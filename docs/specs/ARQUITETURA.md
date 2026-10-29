@@ -21,11 +21,11 @@ O **HqFriend** segue uma arquitetura **Monolítica Modular em Camadas (Layered A
 ```mermaid
 graph TB
     subgraph Presentation ["1. Presentation Layer (UI / PySide6)"]
-        MainWindow["MainWindow (Shell / Navegação / Instância Única)"]
+        MainWindow["MainWindow (Shell / Navegação)"]
         HomeView["HomeView (Grid de Séries + Context Menu + F5)"]
         SeriesView["SeriesView (Lista de HQs + Context Menu)"]
         CoverPickerModal["CoverPickerDialog (Seletor HQ -> Galeria de Páginas)"]
-        ReaderView["ReaderView / Canvas (QGraphicsView + Atalhos)"]
+        ReaderView["ReaderView / Canvas (QGraphicsView + Atalhos + Botão Fechar)"]
         Workers["Workers QThread (LibraryScanWorker, CoverWorker, ThumbnailWorker, ExportWorker)"]
     end
 
@@ -34,15 +34,17 @@ graph TB
         ReaderService["ReaderService (Controle de Sessão, Bookmark, Pareamento Duplo)"]
         CoverService["CoverService (Extração e Cache de Capas)"]
         ExportService["ExportService (União de Imagens e Exportação PNG)"]
-        DomainModels["Domain Models (Series, ComicBook, ReadingState)"]
+        DomainModels["Domain Models (AppState, SeriesState, ComicState, DTOs)"]
     end
 
     subgraph Infrastructure ["3. Infrastructure & Data Layer (I/O & Adapters)"]
         JsonRepo["JsonStateRepository (Escrita Atômica, Backup e Recuperação)"]
-        ArchiveAdapter["ArchiveReaderAdapter (ZipStrategy / RarStrategy em RAM)"]
-        FsScanner["FileSystemScanner (Varredura de Diretórios e Criação de Pastas)"]
-        Logging["LoggingSetup (Log Rotativo + Excepthook)"]
+        ArchiveAdapter["archive_reader (open_archive + IComicArchive: Zip / Rar em RAM)"]
+        FsScanner["fs_scanner (scan_series_folders + ensure_system_directories)"]
+        Logging["logging_setup (Log Rotativo + Excepthook)"]
     end
+
+    Entry["main.py (Bootstrap, Instância Única, Tema)"]
 
     subgraph External ["Recursos do Sistema Operacional (Windows 11)"]
         RootDir[("Diretório Raiz de HQs (.cbr / .cbz)")]
@@ -52,6 +54,7 @@ graph TB
     end
 
     %% Relacionamentos entre camadas
+    Entry --> Presentation
     Presentation --> Application
     Application --> Infrastructure
 
@@ -68,21 +71,22 @@ graph TB
 
 ### 2.1. Camada de Apresentação (`Presentation Layer`)
 Responsável exclusivamente pela renderização visual, captura de eventos de mouse/teclado, orquestração de threads e delegação de ações para a camada de aplicação.
-* **`MainWindow`:** Shell de navegação. Garante instância única do aplicativo (RNF07) e exibe avisos de recuperação de estado ou erros inesperados (RNF02, RNF06).
+* **`main.py` (ponto de entrada):** cria as pastas do sistema, configura o log, cria a `QApplication` (estilo `Fusion`, ícone e `dark_theme.qss` — RNF08), garante a **instância única** antes de criar qualquer janela (RNF07, ADR-08), carrega o estado e exibe o aviso de recuperação do `state.json` quando houver (RNF02). Liga o `UnhandledErrorReporter` (`src/ui/error_dialog.py`) ao log, para que exceções não tratadas de qualquer thread sejam mostradas ao usuário (RNF06).
+* **`MainWindow`:** Shell de navegação com `QStackedWidget` (Tela Inicial → Tela da Série → Leitor). Ajusta o título da janela durante a leitura (RF13-CA2) e, ao fechar, grava o bookmark pendente e encerra o leitor e os workers.
 * **`HomeView` (Tela Inicial):** Exibe o botão de seleção de diretório raiz (RF01), o botão **"Atualizar"** / tecla `F5` (RF19) e o grid de cards das Séries em ordem natural (RF18) com capa, título, badge de status (`Não lida`, `Em andamento`, `Lida`) e contador `X / Y obras` (RF04, sempre no formato `0 / Y` quando nada foi lido). Captura o clique direito na série para acionar *"Marcar como lida"*, *"Marcar como não lida"* (RF10), *"Selecionar imagem de capa"* e *"Restaurar capa padrão"* (RF11). Enquanto a capa padrão de uma série ainda está sendo gerada, o card exibe um *placeholder*.
 * **`CoverPickerDialog` (Fluxo em 2 Etapas - RF12):**
     1. Exibe um seletor (lista/dropdown) perguntando **qual HQ (`.cbr`/`.cbz`)** daquela série o usuário deseja inspecionar.
     2. Após escolhida a HQ, dispara o `ThumbnailWorker`, que carrega em background as miniaturas apenas das páginas daquele arquivo específico para que o usuário selecione a nova capa da série.
 * **`SeriesView` (Tela da Série):** Lista os arquivos `.cbr`/`.cbz` da série selecionada em ordem natural (RF05, RF18). Captura o duplo clique para abrir o leitor (RF13) — exibindo mensagem de erro se o arquivo for inválido (RF20) — e o clique direito para alternar manualmente entre *"Lida"* e *"Não lida"* (RF08).
 * **`ReaderView` (Motor Visual de Leitura):** Baseado em `QGraphicsView` + `QGraphicsScene` (acelerado por hardware). Gerencia:
-    * Navegação por `Seta Esquerda`, `Seta Direita`, `Espaço` e `ESC` (RF14);
+    * Navegação por `Seta Esquerda`, `Seta Direita`, `Espaço` e `ESC`, botão "Fechar" (`✕`) sobreposto e indicador de página (RF14);
     * Zoom matricial suave no cursor via `Ctrl + Scroll` (RF15);
     * Alternância de layout entre 1 ou 2 páginas lado a lado via `Ctrl + S` (RF16);
     * Disparo da exportação de página via `Ctrl + P` (RF17).
 * **Workers (`QThread`):**
-    * `LibraryScanWorker`: executa a varredura do disco (`FileSystemScanner`) fora da thread principal e entrega o resultado bruto para o `LibraryService` mesclar na thread principal.
-    * `CoverWorker`: gera progressivamente as capas padrão ausentes via `CoverService` e emite `cover_ready(series_name)` para atualizar cada card.
-    * `ThumbnailWorker`: extrai e redimensiona as páginas da HQ escolhida no `CoverPickerDialog`, emitindo `page_thumbnail_ready(page_index, QImage)`; verifica `isInterruptionRequested()` entre páginas.
+    * `LibraryScanWorker`: executa a varredura do disco (`fs_scanner.scan_series_folders`) fora da thread principal e emite `scan_finished(raiz_varrida, ScanResult)`; o `LibraryService` mescla o resultado na thread principal, descartando-o se a raiz mudou durante a varredura.
+    * `CoverWorker`: gera progressivamente as capas padrão ausentes via `CoverService` e emite `cover_ready(series_name, cover_path)` para atualizar cada card (`cover_path` é `None` quando a série não tem HQ válida).
+    * `ThumbnailWorker`: extrai e redimensiona as páginas da HQ escolhida no `CoverPickerDialog`, emitindo `page_thumbnail_ready(generation, page_index, QImage)`; `generation` identifica a seleção que originou o sinal, e o diálogo descarta miniaturas de uma seleção anterior. Verifica `isInterruptionRequested()` entre páginas.
     * `ExportWorker`: grava o PNG do `Ctrl + P` fora da thread principal (a gravação de uma página dupla em resolução original leva alguns segundos).
 
 ### 2.2. Camada de Domínio e Aplicação (`Domain & Application Layer`)
@@ -99,14 +103,15 @@ Contém toda a inteligência e regras de negócio do **HqFriend**, sem qualquer 
 Isola o acesso ao sistema operacional, arquivos compactados e persistência.
 * **`JsonStateRepository`:** Gerencia a leitura e gravação do arquivo `%DOCUMENTOS%\HqFriend\state.json` (RNF02):
     * **Escrita atômica:** grava em `state.json.tmp` e aplica `os.replace` para `state.json`, com novas tentativas curtas em caso de `PermissionError` (arquivo bloqueado momentaneamente por OneDrive/antivírus).
+    * **Primeira abertura:** sem `state.json`, cria o arquivo com um `AppState` limpo e o retorna.
     * **Backup:** após carregar com sucesso um `state.json` válido, copia-o para `state.json.bak` (um snapshot por sessão).
     * **Recuperação:** se o `state.json` for inválido (JSON malformado ou schema inválido), renomeia-o para `state.corrupt-<timestamp>.json`, tenta carregar o `.bak` e, se este também falhar, inicia com `AppState` limpo — sinalizando à UI para avisar o usuário.
-* **`ArchiveReaderAdapter` (Padrão Strategy/Adapter):** Interface unificada (`IComicArchive`) que abstrai a diferença entre `.cbz` e `.cbr` (RNF04). O formato real é detectado pelos *Magic Bytes* do arquivo, não pela extensão:
-    * `ZipArchiveStrategy`: Usa a biblioteca nativa `zipfile` para listar entradas de imagem ordenadas de forma natural (*natural sort*, garantindo que `pag_2.jpg` venha antes de `pag_10.jpg`) e extrair bytes sob demanda direto para a RAM.
+* **`archive_reader` (Padrão Strategy):** a função `open_archive(path)` detecta o formato real pelos *Magic Bytes* do arquivo (não pela extensão) e devolve uma implementação da interface `IComicArchive` (`page_count`, `list_sorted_pages()`, `get_page_bytes()`, `close()`), que abstrai a diferença entre `.cbz` e `.cbr` (RNF04):
+    * `ZipArchiveStrategy`: Usa a biblioteca nativa `zipfile` para listar entradas de imagem ordenadas de forma natural (*natural sort*, garantindo que `pag_2.jpg` venha antes de `pag_10.jpg`) e extrair bytes sob demanda direto para a RAM, com um *handle* de `ZipFile` por thread.
     * `RarArchiveStrategy`: Lista as entradas via `rarfile` e, na abertura, extrai **todo o arquivo para a RAM em uma única passada** do binário `UnRAR.exe` embarcado (via *stdout pipe*), evitando um processo por página e a re-descompactação O(n²) de arquivos RAR *solid*.
     * Arquivos corrompidos, protegidos por senha ou sem imagens válidas lançam `InvalidComicError` (RF20).
-* **`FileSystemScanner`:** Responsável por inicializar automaticamente as pastas obrigatórias do sistema (`%DOCUMENTOS%\HqFriend`, `covers\`, `logs\`, `%IMAGENS%\HQs` — RNF03) e escanear o primeiro nível de subpastas do diretório raiz configurado (RF03).
-* **`LoggingSetup`:** Configura log rotativo em `%DOCUMENTOS%\HqFriend\logs\hqfriend.log` e instala `sys.excepthook` / `threading.excepthook` para registrar exceções não tratadas (RNF06).
+* **`fs_scanner`:** funções `ensure_system_directories()`, que cria as pastas obrigatórias do sistema (`%DOCUMENTOS%\HqFriend`, `covers\`, `logs\`, `%IMAGENS%\HQs` — RNF03), e `scan_series_folders(root)`, que varre o primeiro nível de subpastas do diretório raiz (RF03) e devolve um `ScanResult` sem tocar no estado.
+* **`logging_setup`:** `configure(logs_dir, on_unhandled)` configura o log rotativo em `%DOCUMENTOS%\HqFriend\logs\hqfriend.log` e instala `sys.excepthook` / `threading.excepthook` para registrar exceções não tratadas e repassá-las à UI (RNF06).
 
 ---
 
@@ -174,7 +179,7 @@ A modelagem utiliza o **nome da pasta** como chave da Série e o **nome do arqui
 > * `custom_cover_image` é armazenado **relativo** a `%DOCUMENTOS%\HqFriend`, para não quebrar caso a pasta Documentos seja redirecionada. É `null` quando a série usa a capa padrão.
 > * `total_pages` é preenchido/atualizado sempre que a HQ é aberta (a varredura não abre os arquivos compactados).
 
-> **Nota Arquitetural sobre o Status da Série:** Embora o campo `"status"` (`UNREAD`, `IN_PROGRESS`, `READ`) seja persistido no JSON, ele é **sempre revalidado em tempo de execução** pelo `LibraryService` ao escanear a pasta física. Se `Batman` tinha 2 arquivos lidos (`2/2` = `READ`) e o `FileSystemScanner` detectar um 3º arquivo (`Batman_03.cbz`), o `LibraryService` recalcula imediatamente o contador para `2 / 3 obras` e atualiza o status para `IN_PROGRESS` (atendendo integralmente ao **RF09**).
+> **Nota Arquitetural sobre o Status da Série:** Embora o campo `"status"` (`UNREAD`, `IN_PROGRESS`, `READ`) seja persistido no JSON, ele é **sempre revalidado em tempo de execução** pelo `LibraryService` ao escanear a pasta física. Se `Batman` tinha 2 arquivos lidos (`2/2` = `READ`) e a varredura (`fs_scanner.scan_series_folders`) detectar um 3º arquivo (`Batman_03.cbz`), o `LibraryService` recalcula imediatamente o contador para `2 / 3 obras` e atualiza o status para `IN_PROGRESS` (atendendo integralmente ao **RF09**).
 
 ### 3.3. Versionamento e Migração do `state.json`
 O campo `version` identifica a versão do **schema** do arquivo de estado (atual: `"1.0"`). Ele é independente da versão do aplicativo e só muda quando o contrato da seção 3.2 muda.
@@ -198,128 +203,154 @@ O campo `version` identifica a versão do **schema** do arquivo de estado (atual
 ```mermaid
 sequenceDiagram
     actor User as Usuário
+    participant Main as main.py
     participant UI as HomeView (UI)
     participant W as LibraryScanWorker / CoverWorker
     participant Lib as LibraryService
     participant Repo as JsonStateRepository
-    participant FS as FileSystemScanner
+    participant FS as fs_scanner
 
-    User->>UI: Abre o aplicativo HqFriend (ou F5 / volta da SeriesView)
-    UI->>Lib: initialize_library()
-    Lib->>FS: ensure_system_directories()
-    Lib->>Repo: load_state() (com recuperação via .bak se necessário)
-    Repo-->>Lib: Retorna AppState (com root_directory salvo)
+    User->>Main: Abre o aplicativo HqFriend
+    Main->>FS: ensure_system_directories()
+    Main->>Main: logging_setup.configure(), QApplication + tema,<br/>trava de instância única (QLockFile)
+    Main->>Lib: load_state()
+    Lib->>Repo: load() (cria o arquivo na 1ª abertura;<br/>recupera via .bak se corrompido)
+    Repo-->>Lib: LoadResult(AppState, aviso de recuperação?)
+    Main->>UI: MainWindow maximizada + refresh_library()
 
-    alt root_directory está definido e existe no disco
+    Note over User,UI: refresh_library() também é chamado por F5 / "Atualizar",<br/>troca de raiz e retorno da SeriesView (RF19)
+
+    alt root_directory definido e existente no disco
+        UI-->>User: "Atualizando biblioteca…" (RF19-CA4)
         UI->>W: Inicia LibraryScanWorker(root_directory)
         W->>FS: scan_series_folders(root_directory)
-        FS-->>W: Lista de pastas e arquivos [.cbr, .cbz]
-        W-->>UI: Sinal scan_finished(ScanResult)
-        UI->>Lib: apply_scan(ScanResult) (thread principal)
-        Lib->>Lib: Cruza arquivos físicos com state.json<br/>Recalcula contadores (X/Y) e Status da Série
-        Lib->>Repo: save_state() (Persiste novos arquivos/status)
-        Lib-->>UI: Retorna lista de SeriesDTO em ordem natural
-        UI-->>User: Renderiza Grid de Séries (placeholder nas capas ausentes)
-        UI->>W: Inicia CoverWorker(séries sem capa em cache)
-        loop Para cada série sem capa
-            W->>W: CoverService.ensure_default_cover(series)
-            W-->>UI: Sinal cover_ready(series_name)
-            UI-->>User: Atualiza o card da série
+        FS-->>W: ScanResult (séries e arquivos .cbr/.cbz)
+        W-->>UI: Sinal scan_finished(raiz_varrida, ScanResult)
+        alt raiz mudou durante a varredura
+            UI->>UI: Descarta o resultado e varre de novo
+        else mesma raiz
+            UI->>Lib: apply_scan(ScanResult) (thread principal)
+            Lib->>Lib: Cruza arquivos físicos com o estado<br/>Recalcula contadores (X/Y) e status das séries
+            Lib->>Repo: save()
+            Lib-->>UI: Lista de SeriesDTO em ordem natural
+            UI-->>User: Grid de séries (placeholder nas capas ausentes)
+            UI->>W: Inicia CoverWorker(séries sem capa em cache)
+            loop Para cada série sem capa
+                W->>W: CoverService.ensure_default_cover(series, comic_paths)
+                W-->>UI: Sinal cover_ready(series_name, cover_path)
+                UI-->>User: Atualiza o card da série
+            end
         end
     else root_directory vazio ou inexistente
-        Lib-->>UI: Retorna estado vazio (estado salvo é preservado)
-        UI-->>User: Exibe Tela Inicial convidando a "Selecionar Pasta"
+        UI-->>User: Estado vazio convidando a "Selecionar pasta"<br/>(estado salvo é preservado — RF02-CA2/CA3)
     end
 ```
 
-### 4.2. Seleção Customizada de Capa em 2 Etapas (RF11, RF12 Otimizado)
+### 4.2. Seleção Customizada de Capa em 2 Etapas (RF11, RF12)
 ```mermaid
 sequenceDiagram
     actor User as Usuário
     participant UI as HomeView / CoverPickerDialog
     participant TW as ThumbnailWorker (QThread)
     participant Cov as CoverService
-    participant Arch as ArchiveReaderAdapter
+    participant Arch as archive_reader
+    participant Lib as LibraryService
     participant Repo as JsonStateRepository
 
-    User->>UI: Botão Direito na Série -> "Selecionar imagem de capa"
+    User->>UI: Botão direito na série -> "Selecionar imagem de capa"
     UI->>Cov: get_comics_list(series_name)
-    Cov-->>UI: Lista de arquivos [.cbr, .cbz] da Série (ordem natural)
-    UI-->>User: Passo 1: Pergunta qual HQ deseja visualizar
+    Cov-->>UI: HQs da série em ordem natural
+    UI-->>User: Passo 1: HQ da capa atual pré-selecionada (RF12-CA4)
 
     User->>UI: Seleciona a HQ (ex: "Edicao_05.cbr")
-    UI->>TW: Inicia ThumbnailWorker(comic_path)
+    UI->>TW: Interrompe o worker anterior (se houver) e inicia<br/>ThumbnailWorker(comic_path, generation)
 
     TW->>Cov: iter_thumbnails(comic_path)
-    Cov->>Arch: open_archive(comic_path) (uma única vez)
+    Cov->>Arch: open_archive(comic_path) (uma única vez — ADR-13)
     loop Para cada página (até isInterruptionRequested)
         Cov->>Arch: get_page_bytes(page_index)
-        Arch-->>Cov: Bytes da Imagem (RAM)
-        Cov-->>TW: (page_index, thumbnail 250px)
-        TW-->>UI: Sinal page_thumbnail_ready(page_index, QImage)
+        Arch-->>Cov: Bytes da imagem (RAM)
+        Cov-->>TW: (page_index, miniatura de 250px)
+        TW-->>UI: Sinal page_thumbnail_ready(generation, page_index, QImage)
+        UI->>UI: Ignora se generation for de uma seleção anterior
     end
     Note over TW,Cov: Interrupção: TW fecha o gerador, liberando o arquivo
 
-    User->>UI: Passo 2: Clica na página desejada para ser a Capa
+    User->>UI: Passo 2: seleciona a página e confirma (botão ou duplo clique)
     UI->>Cov: set_custom_cover(series_name, comic_filename, page_index)
-    Cov->>Arch: get_page_bytes(page_index) (Alta resolução)
-    Cov->>Cov: Salva imagem otimizada em Documentos\HqFriend\covers\{Serie}.png
-    Cov->>Repo: Atualiza custom_cover_image e cover_source no state.json
-    Cov-->>UI: Confirma atualização
-    UI-->>User: Atualiza o card da Série na Tela Inicial
+    Cov->>Arch: open_archive() + get_page_bytes(page_index) (resolução original)
+    Cov->>Cov: Salva PNG (máx. 400px de largura) em<br/>Documentos\HqFriend\covers\{Serie}.png (gravação atômica)
+    Cov->>Lib: set_cover_reference(series_name, CoverSource)
+    Lib->>Repo: save() (custom_cover_image e cover_source)
+    Cov-->>UI: Caminho da capa
+    UI-->>User: Fecha o diálogo e atualiza o card da série
 ```
 
-### 4.3. Leitura, Pareamento Duplo, Bookmark e Exportação `Ctrl+P` (RF06, RF07, RF16, RF17, RF20)
+### 4.3. Leitura, Pareamento Duplo, Bookmark e Exportação `Ctrl+P` (RF06, RF07, RF14, RF16, RF17, RF20)
 ```mermaid
 sequenceDiagram
     actor User as Usuário
+    participant MW as MainWindow
     participant RView as ReaderView (UI)
     participant RServ as ReaderService
     participant Lib as LibraryService
-    participant Arch as ArchiveReaderAdapter
+    participant Arch as archive_reader
+    participant EW as ExportWorker (QThread)
     participant Exp as ExportService
     participant Repo as JsonStateRepository
 
-    User->>RView: Duplo clique na HQ
+    User->>MW: Duplo clique na HQ (SeriesView)
+    MW->>RView: open_comic(series_name, comic_filename)
     RView->>RServ: open_comic(series_name, comic_filename)
-    RServ->>Arch: open_archive(comic_path) & list_sorted_pages()
+    RServ->>Arch: open_archive(comic_path)
     alt Arquivo inválido / sem imagens
         Arch-->>RServ: InvalidComicError
-        RServ-->>RView: Erro (status da HQ inalterado)
-        RView-->>User: Mensagem de erro amigável (permanece na SeriesView)
+        RServ-->>MW: InvalidComicError (estado da HQ inalterado)
+        MW-->>User: Mensagem de erro (permanece na SeriesView — RF20)
     else Arquivo válido
-        RServ->>Repo: Consulta is_read e current_page (Bookmark)
-        Note over RServ: is_read = true ou bookmark fora do intervalo -> página 0<br/>Caso contrário -> current_page
-        RServ->>Arch: get_page_bytes(página inicial)
-        Arch-->>RServ: Bytes da Página (RAM)
-        RServ->>RServ: on_visible_pages_changed() (bookmark + verificação de conclusão)
-        RServ-->>RView: Renderiza página inicial/bookmark
+        RServ->>Lib: comic_state() (is_read, current_page)
+        Note over RServ: is_read ou bookmark fora do intervalo -> página 0<br/>Caso contrário -> current_page (alinhado ao par no modo duplo)
+        RServ->>RServ: _on_visible_pages_changed()<br/>(progresso em memória + verificação de conclusão)
+        RView-->>User: Renderiza a(s) página(s) + indicador "Pág. N / Total"
+        MW->>MW: Título "<arquivo> — HqFriend"
     end
 
-    User->>RView: Pressiona Seta Direita / Espaço (Avançar) ou Ctrl+S
-    RView->>RServ: next_page() / toggle_double_mode()
-    Note over RServ: Se Modo Simples: avança +1<br/>Se Modo Duplo: avança +2 (Pares 1-2, 3-4)
-    RServ->>Arch: get_page_bytes(novas_paginas)
-    RServ->>RServ: on_visible_pages_changed()
-    RServ->>Repo: Atualiza current_page no state.json
-
+    User->>RView: Seta Direita / Espaço / Seta Esquerda / Ctrl+S
+    RView->>RServ: next_page() / prev_page() / toggle_double_mode()
+    Note over RServ: Modo único: ±1 · Modo duplo: ±2 (pares 1-2, 3-4)
+    RServ->>Lib: update_reading_progress() (apenas em memória)
+    RServ->>RServ: Prefetch das próximas páginas (cache LRU — ADR-04)
+    RView->>RView: Reinicia o timer de 500 ms (debounce — RF06-CA5)
+    opt Timer expira sem nova virada
+        RView->>RServ: flush()
+        RServ->>Lib: save()
+        Lib->>Repo: save()
+    end
     opt Última página da HQ está visível (RF07)
         RServ->>Lib: mark_comic_read(series, comic)
-        Lib->>Lib: Recalcula X/Y e status da Série
-        Lib->>Repo: save_state()
+        Lib->>Lib: Recalcula X/Y e status da série
+        Lib->>Repo: save() (imediato)
     end
-    RServ-->>RView: Atualiza Canvas com nova(s) página(s)
+    RView-->>User: Nova(s) página(s), zoom ajustado à tela
 
-    User->>RView: Pressiona Ctrl + P (Capturar Página)
-    RView->>Exp: export_current_view(series, comic, page_buffers, first_page_index)
-    alt Modo Página Única
-        Exp->>Exp: Converte buffer único para RGB e PNG
-    else Modo Página Dupla
-        Exp->>Exp: Une os 2 buffers lado a lado em canvas preto,<br/>centralizados verticalmente, sem redimensionar (Pillow)
+    User->>RView: Ctrl + P (capturar página)
+    RView->>RServ: visible_page_bytes() (bytes originais, ignora o zoom)
+    RView->>EW: Inicia ExportWorker(series, comic, first_page_index, page_bytes)
+    EW->>Exp: export_pages(...)
+    alt Página única
+        Exp->>Exp: Converte para RGB
+    else Página dupla
+        Exp->>Exp: Une as 2 páginas lado a lado em canvas preto,<br/>centralizadas verticalmente, sem redimensionar
     end
-    Exp->>Exp: Resolve nome livre (sufixo _2, _3 se existir)
-    Exp->>Exp: Salva em Imagens\HQs\Serie_Arquivo_PagXX.png
-    Exp-->>RView: Notifica sucesso (Feedback visual sutil na tela)
+    Exp->>Exp: Resolve nome livre (sufixo _2, _3...) e salva em<br/>Imagens\HQs\Serie_Arquivo_PagXX.png
+    Exp-->>EW: Caminho do PNG
+    EW-->>RView: Sinal exported(path) / failed(mensagem)
+    RView-->>User: Toast de 2 s (sucesso ou falha)
+
+    User->>RView: ESC ou botão "Fechar" (✕)
+    RView->>MW: Sinal close_requested
+    MW->>RServ: close() (grava o bookmark pendente e libera o arquivo)
+    MW-->>User: Volta à SeriesView atualizada; título "HqFriend"
 ```
 
 ---
@@ -338,3 +369,8 @@ Cada decisão fica em um arquivo próprio em [`docs/adr/`](../adr/), com status,
 | [ADR-06](../adr/ADR-06-extracao-rar-passada-unica.md) | Extração RAR em passada única | `Aceita` |
 | [ADR-07](../adr/ADR-07-logs-excecoes.md) | Logs e exceções não tratadas | `Aceita` |
 | [ADR-08](../adr/ADR-08-instancia-unica.md) | Instância única via `QLockFile` | `Aceita` |
+| [ADR-09](../adr/ADR-09-interface-pyside6.md) | Interface gráfica com PySide6 (Qt 6) | `Aceita` |
+| [ADR-10](../adr/ADR-10-persistencia-json-pydantic.md) | Persistência em JSON validado com Pydantic v2 | `Aceita` |
+| [ADR-11](../adr/ADR-11-empacotamento-onedir.md) | Empacotamento PyInstaller onedir, sem UPX | `Aceita` |
+| [ADR-12](../adr/ADR-12-unrar-embarcado.md) | `UnRAR.exe` embarcado e versionado no repositório | `Aceita` (licença pendente) |
+| [ADR-13](../adr/ADR-13-miniaturas-gerador-unico.md) | Miniaturas do seletor de capa por gerador único | `Aceita` |

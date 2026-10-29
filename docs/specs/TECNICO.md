@@ -7,7 +7,8 @@
 ### 1.1. Core & Runtime
 * **Linguagem:** Python `3.12+` (64-bit)
 * **Sistema Operacional Alvo:** Windows 11 (x64)
-* **Empacotamento e Distribuição:** `PyInstaller 6` em modo **onedir** (pasta `dist/HqFriend/` contendo `HqFriend.exe` e o binário `UnRAR.exe` embarcado).
+* **Empacotamento e Distribuição:** `PyInstaller 6` em modo **onedir** (pasta `dist/HqFriend/` contendo `HqFriend.exe` e o binário `UnRAR.exe` embarcado) — ADR-11.
+* **Decisões de stack:** interface em PySide6 (ADR-09); persistência em JSON validado com Pydantic v2 (ADR-10); `UnRAR.exe` embarcado e versionado (ADR-12).
 
 ### 1.2. Bibliotecas e Pacotes (`requirements.txt`)
 ```text
@@ -31,10 +32,11 @@ pytest==8.3.3             # Testes unitários das camadas de Domínio, Aplicaç�
 * `ctypes`: Resolução das pastas conhecidas do Windows (`SHGetKnownFolderPath`).
 * `re`: Expressões regulares para ordenação natural (*natural sorting*) e sanitização de nomes de arquivos.
 * `collections.OrderedDict` / `threading.Lock`: Cache LRU em memória, seguro entre threads, para *prefetching* de páginas no leitor.
-* `logging` / `logging.handlers.RotatingFileHandler`: Log rotativo de erros (RNF06).
+* `logging` / `logging.handlers.RotatingFileHandler`: Log rotativo de erros (RNF06) — `hqfriend.log` com até 1 MB e 3 arquivos de backup; formato `data [nível] thread logger: mensagem` (`src/infrastructure/logging_setup.py`).
 
 ### 1.4. Binários Externos Embarcados
-* **`bin/UnRAR.exe`**: Executável CLI oficial de descompactação RAR (freeware, redistribuição permitida para extração). Embarcado na árvore do projeto; usado pelo `rarfile` para listagem (`rarfile.UNRAR_TOOL`) e chamado diretamente via `subprocess` para a extração em passada única.
+* **`bin/UnRAR.exe`**: UNRAR **7.23** x64 freeware, executável CLI oficial de descompactação RAR da RARLAB (win.rar GmbH). Embarcado na árvore do projeto; usado pelo `rarfile` para listagem (`rarfile.UNRAR_TOOL`) e chamado diretamente via `subprocess` para a extração em passada única. Procedência, hash e procedimento de atualização: ADR-12.
+* **`bin/license.txt`**: licença freeware do UnRAR ("may be freely distributed... inside of other software packages"), distribuída junto ao binário no repositório e no executável.
 
 ---
 
@@ -43,7 +45,8 @@ pytest==8.3.3             # Testes unitários das camadas de Domínio, Aplicaç�
 ```text
 hqfriend/
 ├── bin/
-│   └── UnRAR.exe                        # Binário embarcado para extração de arquivos .cbr
+│   ├── UnRAR.exe                        # Binário embarcado para extração de arquivos .cbr (ADR-12)
+│   └── license.txt                      # Licença freeware do UnRAR, distribuída junto ao binário
 ├── assets/
 │   ├── icon.ico                         # Ícone do executável Windows
 │   └── styles/
@@ -144,10 +147,10 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
 3. Executa `os.replace(tmp_path, STATE_JSON_PATH)`, garantindo uma operação atômica no NTFS do Windows.
 4. Se `os.replace` lançar `PermissionError` (arquivo bloqueado momentaneamente por OneDrive/antivírus), tenta novamente até **5 vezes** com espera de `100ms`; esgotadas as tentativas, registra em log e propaga o erro.
 
-**Gravação de bookmark com *debounce*:** as atualizações de `current_page` durante a leitura são agrupadas e gravadas no máximo a cada `500ms`, com gravação imediata (*flush*) ao fechar o leitor (`ESC`), ao marcar a HQ como lida e ao encerrar o aplicativo.
+**Gravação de bookmark com *debounce* (QA-06, RF06-CA5):** durante a leitura, `LibraryService.update_reading_progress()` altera o bookmark apenas em memória. A cada mudança de página o `ReaderView` reinicia um `QTimer` *single-shot* de `FLUSH_DELAY_MS` = 500 ms; o estado é gravado (`ReaderService.flush()`) quando o timer expira, isto é, 500 ms após a **última** virada — viradas seguidas adiam a gravação. A gravação é imediata ao fechar o leitor (`ESC` ou botão "Fechar"), ao marcar a HQ como lida e ao encerrar o aplicativo.
 
 **Carregamento, Backup e Recuperação (`JsonStateRepository.load`):**
-1. Se `state.json` não existir: retorna `AppState()` limpo.
+1. Se `state.json` não existir: cria o arquivo com um `AppState()` limpo e o retorna.
 2. Tenta `AppState.model_validate_json(...)`. Em caso de sucesso, copia o arquivo para `state.json.bak` (`shutil.copy2`, um snapshot por sessão) e retorna o estado.
 3. Em caso de falha (`ValueError` / `ValidationError`): renomeia o arquivo para `state.corrupt-<AAAAMMDD-HHMMSS>.json`, registra em log e tenta carregar `state.json.bak`.
 4. Se o backup também falhar ou não existir: retorna `AppState()` limpo.
@@ -156,7 +159,7 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
 ---
 
 ### 3.3. Motor de Descompactação em Memória e Ordenação Natural (`src/infrastructure/archive_reader.py`)
-* **Filtro de Imagens:** Apenas entradas de arquivo terminadas em `('.jpg', '.jpeg', '.png', '.webp')` (case-insensitive) e que não pertençam a metadados ocultos (como `__MACOSX`) são indexadas.
+* **Filtro de Imagens:** Apenas entradas de arquivo terminadas em `('.jpg', '.jpeg', '.png', '.webp')` (case-insensitive) são indexadas. Diretórios, entradas dentro de `__MACOSX` e arquivos ocultos (nome iniciado por `.`, como `._pagina.jpg`) são ignorados.
 * **Algoritmo de Ordenação Natural (*Natural Sort*)** — `src/domain/sorting.py`, reutilizado para páginas, séries e HQs (RF18):
   ```python
   import re
@@ -164,8 +167,8 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
   def natural_sort_key(name: str) -> list:
       return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', name)]
   ```
-* **Detecção de Formato por *Magic Bytes*:** O `ArchiveReaderAdapter` lê os primeiros bytes do arquivo (`PK\x03\x04` para ZIP vs `Rar!\x1a\x07` para RAR) em vez de confiar apenas na extensão, pois é comum arquivos ZIP serem distribuídos com extensão `.cbr` (e vice-versa).
-* **Extração `.cbz` (`ZipArchiveStrategy`):** Abre `zipfile.ZipFile(path, 'r')` e retorna `zf.read(entry_name)` sob demanda direto em memória (`bytes`). Cada thread que acessa o arquivo (leitor, prefetch, thumbnails) abre seu próprio `ZipFile`.
+* **Detecção de Formato por *Magic Bytes*:** `open_archive(path)` lê os primeiros bytes do arquivo (`PK\x03\x04` ou `PK\x05\x06` para ZIP vs `Rar!\x1a\x07` para RAR) em vez de confiar apenas na extensão, pois é comum arquivos ZIP serem distribuídos com extensão `.cbr` (e vice-versa).
+* **Extração `.cbz` (`ZipArchiveStrategy`):** Abre `zipfile.ZipFile(path, 'r')` e retorna `zf.read(entry_name)` sob demanda direto em memória (`bytes`). Cada thread que acessa o arquivo (leitor, prefetch, thumbnails) abre seu próprio `ZipFile`. Um ZIP com alguma página criptografada é rejeitado na abertura (`InvalidComicError`).
 * **Extração `.cbr` em Passada Única (`RarArchiveStrategy` — ADR-06):**
     1. Configura `rarfile.UNRAR_TOOL = str(UNRAR_BINARY_PATH)` e lista as entradas com `rarfile.RarFile(path).infolist()` (ordem física no arquivo, com `file_size` de cada entrada).
     2. Executa **um único** processo `UnRAR.exe p -inul -p- <arquivo>`, que escreve no `stdout` o conteúdo de todos os arquivos em sequência, na ordem física do arquivo. A opção `-p-` impede que o processo aguarde senha.
@@ -181,8 +184,8 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
 ### 3.4. Sincronização de Biblioteca e Cálculo de Status (`src/services/library_service.py`)
 A sincronização é dividida em duas etapas para manter a UI responsiva e o `AppState` mutado apenas na thread principal:
 
-**Etapa 1 — Varredura (`FileSystemScanner.scan_series_folders`, executada no `LibraryScanWorker`):**
-1. Lista todas as subpastas imediatas de `root_directory` (**RF03**).
+**Etapa 1 — Varredura (`fs_scanner.scan_series_folders`, executada no `LibraryScanWorker`):**
+1. Lista todas as subpastas imediatas de `root_directory` (**RF03**). Raiz inexistente, inacessível ou que seja arquivo resulta em `ScanResult` vazio; pasta de série inacessível é ignorada e registrada em log.
 2. Para cada subpasta, lista os arquivos `.cbr` e `.cbz` presentes fisicamente no primeiro nível (`disk_files`). Pastas com `len(disk_files) == 0` são descartadas.
 3. Retorna um `ScanResult` (`dict[series_name, list[filename]]`), sem tocar no estado.
 
@@ -194,15 +197,15 @@ A sincronização é dividida em duas etapas para manter a UI responsiva e o `Ap
     * Se `X == 0` e nenhuma HQ presente no disco possui `current_page > 0` $\rightarrow$ `SeriesStatus.UNREAD` ("Não lida").
     * Caso contrário (`0 < X < Y` ou alguma HQ em andamento) $\rightarrow$ `SeriesStatus.IN_PROGRESS` ("Em andamento"). *Isso garante automaticamente que uma série "Lida" (`11/11`) volte para "Em andamento" (`11/12`) assim que um 12º arquivo for adicionado à pasta.*
 4. Persiste o estado e devolve à UI a lista de `SeriesDTO` ordenada por `natural_sort_key(series_name)`, com as HQs de cada série também em ordem natural (**RF18**).
-5. Identifica as séries cujo arquivo `covers\{series_name}.png` não existe e as entrega ao `CoverWorker`, que chama `CoverService.ensure_default_cover()` (página 0 da primeira HQ em ordem natural) para cada uma, emitindo `cover_ready(series_name)`. Se a primeira HQ for inválida, tenta a próxima; se nenhuma for válida, o card mantém o *placeholder*.
+5. Identifica as séries cujo arquivo `covers\{series_name}.png` não existe e as entrega ao `CoverWorker`, que chama `CoverService.ensure_default_cover()` (página 0 da primeira HQ em ordem natural) para cada uma, emitindo `cover_ready(series_name, cover_path)`. Se a primeira HQ for inválida, tenta a próxima; se nenhuma for válida, o card mantém o *placeholder*.
 
-**Gatilhos da Sincronização (RF19):** inicialização, troca de diretório raiz, retorno da `SeriesView` para a `HomeView` e tecla `F5` / botão **"Atualizar"**. Uma nova varredura solicitada enquanto outra está em execução é ignorada (ou enfileirada uma única vez).
+**Gatilhos da Sincronização (RF19):** inicialização, troca de diretório raiz, retorno da `SeriesView` para a `HomeView` e tecla `F5` / botão **"Atualizar"**. Uma nova varredura solicitada enquanto outra está em execução é enfileirada uma única vez; se a raiz mudou durante a varredura, o resultado é descartado e uma nova varredura é feita (ver §6, item 6).
 
 **Marcações Manuais (RF08, RF10):**
 * `mark_comic_read(series, comic)`: `is_read = True`; mantém `current_page`.
 * `mark_comic_unread(series, comic)`: `is_read = False` e `current_page = 0` (zera o bookmark).
 * `mark_series_read(series)` / `mark_series_unread(series)`: aplicam as regras acima a todas as HQs presentes no disco.
-* Após qualquer marcação: `recalculate_series_status(series)` e `save_state()`.
+* Após qualquer marcação: `recalculate_series_status(series)` e `JsonStateRepository.save()`.
 
 ---
 
@@ -278,29 +281,40 @@ Atende integralmente ao **RF17** e às validações técnicas de sanitização, 
 
 ---
 
+### 3.7. Capas e Miniaturas (`src/services/cover_service.py`)
+* **Capa padrão:** página 0 da primeira HQ válida da série, em ordem natural (HQs inválidas são puladas e registradas em log); sem nenhuma HQ válida, a série fica sem capa e o card exibe *placeholder* (RF11-CA2). Gerada pelo `CoverWorker` só para séries sem arquivo em `covers\`.
+* **Arquivo de capa:** `%DOCUMENTOS%\HqFriend\covers\{Serie}.png`, reduzido para no máximo **400 px** de largura (`COVER_MAX_WIDTH`), mantendo a proporção e sem ampliar; PNG otimizado, com gravação atômica (`.png.tmp` → `os.replace`).
+* **Capa customizada:** `set_custom_cover()` regrava o arquivo a partir da página escolhida (em resolução original antes da redução) e registra `custom_cover_image` / `cover_source` via `LibraryService.set_cover_reference()`. `restore_default_cover()` apaga o arquivo, limpa a referência e regera a capa padrão.
+* **Miniaturas do seletor:** `iter_thumbnails(comic_path)` abre a HQ **uma única vez** e produz `(índice, miniatura)` com **250 px** de largura (`THUMBNAIL_WIDTH`); páginas ilegíveis são puladas e registradas em log. Fechar o gerador libera o arquivo (ADR-13). No diálogo, as miniaturas são exibidas em ícones de 150×225.
+
+---
+
 ## 4. Especificação da Interface Gráfica e Eventos (`src/ui/`)
 
 ### 4.1. Inicialização, Instância Única e Navegação em Janela Única (`main.py` + `MainWindow` + `QStackedWidget`)
 **Sequência de inicialização (`src/main.py`):**
-1. `ensure_system_directories()` (RNF03) e `logging_setup.configure(LOGS_DIR)` — instala `sys.excepthook` e `threading.excepthook`, que registram a exceção em log e, quando houver `QApplication`, exibem `QMessageBox` com mensagem amigável (RNF06).
-2. Cria `QApplication` e adquire `QLockFile(LOCK_FILE_PATH)` com `tryLock(100)`. Se a trava não for obtida, exibe *"O HqFriend já está aberto"* e encerra (RNF07). `QLockFile` remove travas obsoletas de processos que morreram.
-3. Carrega o estado; se houver `StateRecoveredWarning`, exibe o aviso correspondente após a janela abrir.
+1. `ensure_system_directories()` (RNF03) e `logging_setup.configure(LOGS_DIR)` — instala `sys.excepthook` e `threading.excepthook`, que registram a exceção em log.
+2. Cria a `QApplication` com estilo `Fusion` e ícone; cria o `UnhandledErrorReporter` (`src/ui/error_dialog.py`) e chama `logging_setup.configure` de novo, agora com `on_unhandled=reporter.report`, para que exceções não tratadas de qualquer thread também sejam exibidas em `QMessageBox`, uma por vez (RNF06).
+3. Adquire `QLockFile(LOCK_FILE_PATH)` com `setStaleLockTime(0)` e `tryLock(100)`. Se a trava não for obtida, exibe *"O HqFriend já está aberto."* e encerra (RNF07). Travas de processos que morreram são detectadas pelo PID e removidas pelo `QLockFile` (RNF07-CA1).
+4. Aplica `assets/styles/dark_theme.qss` (RNF08), carrega o estado e cria a `MainWindow` maximizada; se houver `StateRecoveredWarning`, exibe o aviso correspondente logo após a janela abrir. Por fim, chama `HomeView.refresh_library()`.
 
-A `MainWindow` inicia maximizada em **Dark Mode** (`#121212`) e contém um `QStackedWidget` com 3 índices:
+A `MainWindow` inicia maximizada em **Dark Mode** (`#121212` — RNF08) e contém um `QStackedWidget` com 3 índices:
 * `Index 0` $\rightarrow$ `HomeView` (Sempre exibida ao iniciar o aplicativo — **RF02**).
 * `Index 1` $\rightarrow$ `SeriesView` (Exibida ao clicar em um card de série na `HomeView`; ao voltar para a `HomeView`, dispara nova sincronização — **RF19**).
-* `Index 2` $\rightarrow$ `ReaderView` (Exibida ao dar duplo clique em uma HQ válida na `SeriesView`; ao pressionar `ESC`, grava o bookmark pendente e retorna imediatamente para o `Index 1` atualizando os contadores e badges).
+* `Index 2` $\rightarrow$ `ReaderView` (Exibida ao dar duplo clique em uma HQ válida na `SeriesView`, com o título da janela `<arquivo> — HqFriend`; ao pressionar `ESC` ou o botão "Fechar", grava o bookmark pendente, restaura o título `HqFriend` e retorna imediatamente para o `Index 1` atualizando os contadores e badges).
 
 ### 4.2. Canvas de Leitura, Zoom, Pan e Reset (`ReaderView`)
 Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fundo preto (`#000000`):
 * **Renderização:** Converte os bytes da página em `QImage` $\rightarrow$ `QPixmap` com `Qt.SmoothTransformation`.
 * **Captura de Teclado:** `QGraphicsView` (via `QAbstractScrollArea`) consome as setas e a barra de espaço para rolagem. A `ReaderView` sobrescreve `keyPressEvent` para tratar `Left`, `Right`, `Space`, `Esc`, `Ctrl + S` e `Ctrl + P` antes da implementação padrão. Os atalhos com `Ctrl` também ficam no `keyPressEvent` (e não em `QShortcut`): o efeito é o mesmo — ativos apenas com o leitor em foco — e o tratamento é testável enviando eventos de teclado ao widget.
-* **Indicador de Página:** um rótulo sobreposto exibe `Pág. N / Total` (ou `Págs. N–M / Total` no modo duplo).
+* **Indicador de Página:** um rótulo sobreposto, centralizado na base, exibe `Pág. N / Total` (ou `Págs. N–M / Total` no modo duplo — RF14-CA4).
+* **Botão "Fechar" (RF14-CA3):** `QPushButton` `✕` filho do `ReaderView` (`objectName="readerCloseButton"`, 32×32, tooltip `Fechar (Esc)`), posicionado no canto superior direito com margem `OVERLAY_MARGIN` = 16 px e reposicionado no `resizeEvent`. Usa `focusPolicy = Qt.NoFocus` para não tirar o foco de teclado do leitor; o clique emite o mesmo `close_requested` do `ESC`.
+* **Página ilegível (RF21):** se nem o Qt nem o Pillow decodificarem os bytes, a página é substituída por um quadro 600×900 com o texto "Página ilegível" e o problema é registrado em log como aviso; a navegação e a conclusão não são afetadas.
 * **Ajuste Inicial e Reset na Virada de Página:**
-    * A função `reset_zoom_fit_to_view()` chama `self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)` e define `self._zoom_level = 0`.
-    * **Regra validada:** Sempre que o usuário avançar ou voltar de página (`Seta Direita`, `Seta Esquerda`, `Espaço`) ou alternar o modo único/duplo (`Ctrl + S`), `reset_zoom_fit_to_view()` é executado automaticamente. O mesmo ocorre ao redimensionar a janela.
+    * A função `reset_zoom_fit_to_view()` desfaz a transformação, chama `fitInView(sceneRect, Qt.KeepAspectRatio)` e define `_zoom = 1.0`: o zoom é relativo ao ajuste à tela. As barras de rolagem ficam sempre ocultas.
+    * **Regra validada:** Sempre que o usuário avançar ou voltar de página (`Seta Direita`, `Seta Esquerda`, `Espaço`) ou alternar o modo único/duplo (`Ctrl + S`), `reset_zoom_fit_to_view()` é executado automaticamente. Ao redimensionar a janela, a página é reajustada à tela se o zoom estiver em 1x.
 * **Zoom (`Ctrl + Scroll` — RF15) e Arraste com Mouse (*Pan*):**
-    * `setDragMode(QGraphicsView.ScrollHandDrag)`: Permite clicar e arrastar a página com o botão esquerdo do mouse sempre que o zoom ultrapassar o tamanho da área visível.
+    * `setDragMode(QGraphicsView.ScrollHandDrag)` só fica ativo com zoom acima de 1x (com zoom ≤ 1x, `NoDrag`): permite clicar e arrastar a página ampliada com o botão esquerdo do mouse.
     * `setTransformationAnchor(QGraphicsView.AnchorUnderMouse)`: O zoom amplia exatamente na região onde o cursor do mouse está apontando.
     * No `wheelEvent(event)`:
         * Se `event.modifiers() & Qt.ControlModifier`: aplica fator de escala `1.15` (scroll up) ou `1 / 1.15` (scroll down), limitado entre `0.5x` e `5.0x` da escala base.
@@ -314,16 +328,16 @@ Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fund
 | **`HomeView`** | Clique Direito no Card da Série | Abre `QMenu` com: **1. "Selecionar imagem de capa"**, **2. "Restaurar capa padrão"** (somente se houver capa customizada), **3. "Marcar como lida"** (desabilitada se a série estiver `READ`) e **4. "Marcar como não lida"** (desabilitada se a série estiver `UNREAD`). |
 | **`HomeView`** | `F5` ou botão **"Atualizar"** | Dispara `LibraryScanWorker` para reescanear o diretório raiz (RF19). |
 | **`CoverPickerDialog`** | Seleção no `QComboBox` (Passo 1) | Interrompe o worker anterior (se houver) e dispara `ThumbnailWorker` em background extraindo as páginas apenas da HQ escolhida (250px de largura), populando o `QListWidget` em modo `IconMode`. |
-| **`CoverPickerDialog`** | Clique na Página + Confirmar (Passo 2) | Salva a página escolhida em `%DOCUMENTOS%\HqFriend\covers\{Serie}.png` e atualiza o card na `HomeView`. |
+| **`CoverPickerDialog`** | Clique na Página + Confirmar, ou duplo clique na miniatura (Passo 2) | Salva a página escolhida em `%DOCUMENTOS%\HqFriend\covers\{Serie}.png` e atualiza o card na `HomeView`. O botão "Definir como capa" só fica habilitado com uma página selecionada (RF12-CA4). |
 | **`SeriesView`** | Duplo Clique na HQ (`itemDoubleClicked`) | Abre `ReaderView` na HQ selecionada (retomando do Bookmark se a HQ não estiver lida). Se o arquivo for inválido, exibe `QMessageBox` de erro e permanece na tela (RF20). |
 | **`SeriesView`** | Clique Direito na HQ | Abre `QMenu` com **"Marcar como lida"** (ou **"Marcar como não lida"** se já estiver lida — zera o bookmark). |
-| **`ReaderView`** | `Right` (Seta Direita) ou `Space` | Avança página/par, reseta o zoom para *Fit-to-View*, salva bookmark e verifica conclusão. |
-| **`ReaderView`** | `Left` (Seta Esquerda) | Volta página/par, reseta o zoom para *Fit-to-View* e salva bookmark. |
-| **`ReaderView`** | `Ctrl + S` | Alterna `double_page_mode` (pareamento a partir da pág 1), re-renderiza, reseta o zoom, salva bookmark e verifica conclusão. |
-| **`ReaderView`** | `Ctrl + P` | Chama `ExportService`, salva PNG em `%IMAGENS%\HQs` (sem sobrescrever) e exibe um *Toast/Overlay* discreto `"Página salva em Imagens\HQs"` por 2 segundos. |
+| **`ReaderView`** | `Right` (Seta Direita) ou `Space` | Avança página/par, reseta o zoom para *Fit-to-View*, agenda a gravação do bookmark (*debounce*) e verifica conclusão. |
+| **`ReaderView`** | `Left` (Seta Esquerda) | Volta página/par, reseta o zoom para *Fit-to-View* e agenda a gravação do bookmark (*debounce*). |
+| **`ReaderView`** | `Ctrl + S` | Alterna `double_page_mode` (pareamento a partir da pág 1, preferência persistida), re-renderiza, reseta o zoom, agenda a gravação do bookmark e verifica conclusão. |
+| **`ReaderView`** | `Ctrl + P` | Inicia um `ExportWorker` que chama `ExportService.export_pages()`, salva PNG em `%IMAGENS%\HQs` (sem sobrescrever) e exibe um *Toast* discreto `"Página salva em Imagens\HQs"` + nome do arquivo (ou a mensagem de falha) por 2 segundos. |
 | **`ReaderView`** | `Ctrl + Scroll do Mouse` | Aplica Zoom In / Zoom Out ancorado no cursor. |
 | **`ReaderView`** | Arrastar com Botão Esquerdo | Move a página ampliada pelo canvas (*Pan*). |
-| **`ReaderView`** | `ESC` | Grava o bookmark pendente, fecha a leitura da HQ, libera o arquivo `.cbr`/`.cbz` da memória e volta para `SeriesView`. |
+| **`ReaderView`** | `ESC` ou clique no botão "Fechar" (`✕`) | Grava o bookmark pendente, fecha a leitura da HQ, libera o arquivo `.cbr`/`.cbz` da memória e volta para `SeriesView`. |
 
 ---
 
@@ -338,7 +352,7 @@ pyinstaller --noconfirm --clean HqFriend.spec
 
 ### Configuração do `HqFriend.spec` (arquivo na raiz do projeto):
 * Entrada `src/main.py`; modo **onedir** (`exclude_binaries=True` + `COLLECT`), nome `HqFriend`.
-* `binaries`: `('bin/UnRAR.exe', 'bin')`. `datas`: `assets/styles/dark_theme.qss` e `assets/icon.ico`.
+* `binaries`: `('bin/UnRAR.exe', 'bin')`. `datas`: `assets/styles/dark_theme.qss`, `assets/icon.ico` e `('bin/license.txt', 'bin')` (licença do UnRAR, ADR-12).
 * `console=False` (GUI pura), `icon='assets/icon.ico'`, `upx=False` (UPX corrompe DLLs do Qt com frequência e aumenta falsos positivos de antivírus), `excludes=['tkinter']`.
 
 > **Notas:** os parâmetros `block_cipher`/`cipher`, `win_no_prefer_redirects` e `win_private_assemblies` foram removidos no PyInstaller 6 e não devem ser usados. Evitar excluir módulos da biblioteca padrão como `email`, `http` e `xml`: `importlib.metadata` (usado pelo pydantic) depende de `email`. O resultado é a pasta `dist/HqFriend/`, distribuída inteira (ex: compactada em `.zip`).
@@ -352,10 +366,45 @@ pyinstaller --noconfirm --clean HqFriend.spec
     * *Extração (passada única):* a chamada própria a `subprocess.run` usa `creationflags=subprocess.CREATE_NO_WINDOW` (`0x08000000`).
     * *Listagem via `rarfile`:* o `rarfile==4.2` já injeta `CREATE_NO_WINDOW` em `rarfile.custom_popen` no Windows (verificado em 2026-10-24). Ao atualizar a versão do `rarfile`, reconfirmar. Coberto pelo critério RNF04-CA5 (`REQUISITOS.md`).
 2. **Interrupção do `ThumbnailWorker` na Galeria de Capas (`CoverPickerDialog`):**
-   Se o usuário abrir uma HQ com 150 páginas no seletor de capas e fechar o modal (ou trocar de HQ) antes do `ThumbnailWorker` terminar, o diálogo chama `worker.requestInterruption()` e `worker.wait()` no `closeEvent`. O worker (subclasse de `QThread`) verifica `isInterruptionRequested()` entre cada página, encerra o laço e libera o arquivo `.cbr`/`.cbz`.
+   O `ThumbnailWorker` (subclasse de `QThread`) verifica `isInterruptionRequested()` entre cada página, encerra o laço e libera o arquivo `.cbr`/`.cbz`.
+    * *Troca de HQ:* o worker anterior recebe `requestInterruption()` **sem** `wait()` (a interface não bloqueia); ele termina após a página em andamento, e suas miniaturas são descartadas pelo contador de geração.
+    * *Fechar ou cancelar o diálogo* (`done()` / `closeEvent`): todos os workers recebem `requestInterruption()` e são aguardados com `wait()`, garantindo que nenhum arquivo fique aberto.
 3. **Arquivos `.cbr`/`.cbz` com Imagens WebP ou Corrompidas:**
    O Qt6 suporta `.jpg`, `.png` e `.webp`. Contudo, para máxima compatibilidade com *scans* antigos que possuem cabeçalhos JPEG fora do padrão, caso `QImage.fromData(raw_bytes)` retorne nulo (`isNull()`), o sistema fará fallback automático passando os bytes pelo `Pillow` (`Image.open(BytesIO(raw_bytes)).convert("RGB")`) e convertendo para `QImage`. Se ambos falharem, a página é exibida como um quadro de erro e o problema é registrado em log.
 4. **Concorrência entre Threads:**
    O `AppState` só é alterado na thread principal. O cache LRU de páginas é protegido por `threading.Lock`; cada thread abre seu próprio `zipfile.ZipFile`; o `dict` de páginas de um CBR é imutável após a extração e pode ser lido por várias threads. `QPixmap` só é criado na thread principal (workers produzem `QImage`).
 5. **Memória em CBRs Grandes:**
-   A extração em passada única mantém o CBR inteiro em RAM (tipicamente 30–300 MB). A memória é liberada ao fechar o leitor (`ESC`). Para o seletor de capas, o `ThumbnailWorker` reaproveita a mesma estratégia e descarta os bytes originais assim que cada miniatura é gerada.
+   A extração em passada única mantém o CBR inteiro em RAM (tipicamente 30–300 MB). A memória é liberada ao fechar o leitor (`ESC` ou botão "Fechar"). Para o seletor de capas, o `ThumbnailWorker` reaproveita a mesma estratégia e descarta os bytes originais assim que cada miniatura é gerada.
+6. **Ciclo de Vida de Workers e Encerramento:**
+    * *Varredura:* uma varredura pedida durante outra é enfileirada uma única vez; o resultado de uma raiz que mudou durante a varredura é descartado e a varredura é refeita (RF19-CA3).
+    * *Miniaturas:* sinais de uma seleção anterior são descartados pelo contador de geração (`page_thumbnail_ready(generation, ...)`).
+    * *Encerramento:* ao fechar a janela, a `MainWindow` grava o bookmark pendente (`ReaderView.close_comic()`), aguarda as exportações em andamento (`ReaderView.shutdown()`) e chama `HomeView.shutdown()`, que bloqueia novas varreduras e gerações de capa e aguarda as threads ativas. Sem isso, o worker de capas podia iniciar uma geração pendente durante o encerramento e a janela era destruída com uma `QThread` ativa (corrigido na v1.0, Registro #015).
+
+---
+
+## 7. Estratégia de Testes
+
+> Migrada de `archive/v1.0/PLANO_DESENVOLVIMENTO.md` §1.1 e atualizada pelo FIX-01. A ligação de cada critério de aceite com sua verificação está em `REQUISITOS.md` §7.
+
+### 7.1. Organização
+* **pytest** para todas as camadas, inclusive a interface: `tests/domain/`, `tests/infrastructure/`, `tests/services/` e `tests/ui/`, espelhando `src/`. Execução: `.venv\Scripts\python.exe -m pytest` (`pytest.ini`: `pythonpath = .`, `testpaths = tests`).
+* **Rastreabilidade:** testes novos citam o critério que cobrem em comentário (`# RF14-CA3`, `# FIX-01 / RF21-CA1`); testes de FIX citam o pacote.
+* **Verificação manual:** critérios que só podem ser observados no executável ou em medição (ex: RNF01, RNF04-CA5, RNF05-CA1/CA2) seguem roteiro manual registrado no pacote que os altera.
+
+### 7.2. Isolamento
+* Testes nunca gravam nas pastas reais do usuário: `JsonStateRepository`, `LibraryService`, `CoverService` e `ExportService` recebem caminhos em `tmp_path`; a `MainWindow` aceita um `ExportService` injetável.
+* Bibliotecas de teste são montadas em `tmp_path` a partir das fixtures (`tests/ui/conftest.py::library_root`).
+
+### 7.3. Fixtures de arquivos compactados
+* `tests/fixtures/build_fixtures.py` gera, via Pillow e o `Rar.exe` do WinRAR, os arquivos versionados em `tests/fixtures/`: ZIP simples, RAR4, RAR5, RAR5 *solid*, ZIP renomeado para `.cbr`, RAR renomeado para `.cbz`, sem imagens, com senha (arquivo e cabeçalho), ZIP/RAR truncados, arquivo vazio e texto renomeado.
+* Regenerar só é necessário ao criar novas fixtures; o `Rar.exe` **não** é dependência para rodar os testes.
+
+### 7.4. Testes de interface (`tests/ui/`)
+* Executados em modo **offscreen** (`QT_QPA_PLATFORM=offscreen`), com `QT_QPA_FONTDIR` apontando para as fontes do Windows — sem isso, as medidas de texto ficam irreais (`conftest.py`).
+* A fixture de sessão `qapp` cria a `QApplication` e aplica o `dark_theme.qss`.
+* **`SignalRecorder`** (`conftest.py`) aguarda sinais rodando o loop de eventos. Não usar `QSignalSpy.wait()`: no PySide6 ele mantém o GIL durante a espera e impede a execução dos workers `QThread` escritos em Python. Crie o recorder **antes** da ação que emite o sinal.
+
+### 7.5. Armadilhas conhecidas do PySide6 / Qt 6
+* Passar um **sinal** como `clicked=` / `activated=` no construtor de um widget não o conecta (corrigido na v1.0, Registro #015): conecte com `.connect(...)`. Passar um *slot* (método ou função) funciona.
+* `clicked` envia o argumento `checked`; um sinal sem parâmetros o rejeita — use `lambda: sinal.emit()`.
+* `QTest.mouseDClick` sozinho não gera `itemDoubleClicked` em `QListWidget`: simule a sequência real com `QTest.mouseClick` seguido de `QTest.mouseDClick` (FIX-01).

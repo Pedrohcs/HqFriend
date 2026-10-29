@@ -41,7 +41,7 @@ Pacote **misto**, com uma parte de código e uma de spec:
 ## 4. Correção
 
 ### 4.1. Código (Tipo A + ajustes)
-* **Arquivos alterados:** `src/ui/views/reader_view.py`, `assets/styles/dark_theme.qss`, `tests/ui/test_reader_view.py`, `tests/ui/test_home_view.py` (ou novo `tests/test_main.py`), `HqFriend.spec` e `bin/license.txt` (tarefa T10b).
+* **Arquivos alterados:** `src/ui/views/reader_view.py`, `assets/styles/dark_theme.qss`, `tests/ui/test_reader_view.py`, `tests/ui/test_home_view.py`, `tests/ui/test_cover_picker_dialog.py`, `HqFriend.spec`, `bin/UnRAR.exe` (6.11 → 7.23) e `bin/license.txt` (tarefa T10b).
 * **Abordagem:**
   1. **Botão Fechar no leitor (RF14-CA3):** `QPushButton` filho do `ReaderView`, sobreposto no canto superior direito (mesmo padrão de posicionamento do `page_indicator`, reposicionado no `resizeEvent`), texto `✕`, tooltip `Fechar (Esc)`, `objectName="readerCloseButton"`, `focusPolicy = Qt.NoFocus` (para não roubar o foco do teclado do leitor). O clique emite o mesmo `close_requested` do `ESC`, de modo que a `MainWindow` segue o fluxo existente de `close_reader()` (grava bookmark, libera o arquivo, volta à Tela da Série atualizada). Estilo no `dark_theme.qss`: fundo translúcido, destaque âmbar no *hover*.
   2. **Comentário do bookmark (QA-06):** corrigir o comentário de `reader_view.py:80` para "grava 500 ms após a última mudança de página (*debounce*)". Sem mudança de comportamento.
@@ -205,9 +205,9 @@ Execução em 4 blocos, com revisão do usuário ao fim de cada um: **Bloco 1** 
 ### Documentação
 - [x] **T7** — Aplicar a seção 5.1 em `specs/REQUISITOS.md` (RF02, RF06, RF12, RF13, RF14, RF19 modificados; RF21 e RNF08 adicionados; convenção de verificação)
 - [x] **T8** — Aplicar a seção 5.2 (QA-02 a QA-06)
-- [ ] **T9** — Aplicar os itens 1 a 20 da seção 5.3 em `ARQUITETURA.md` e `TECNICO.md`
-- [ ] **T10** — Criar ADR-09 a ADR-13 e atualizar o índice da ARQ §5
-- [ ] **T10b** — Copiar o texto da licença do UnRAR (`license.txt` da instalação local do WinRAR, mesma origem do binário — Registro #009) para `bin/license.txt`, embarcá-lo no `HqFriend.spec` (`datas`) e registrar em TECNICO §1.4 e na ADR-12
+- [x] **T9** — Aplicar os itens 1 a 20 da seção 5.3 em `ARQUITETURA.md` e `TECNICO.md`
+- [x] **T10** — Criar ADR-09 a ADR-13 e atualizar o índice da ARQ §5
+- [x] **T10b** — Decisão do usuário (2026-10-29): opção 1, usar o UnRAR oficial da RARLAB. Resultado: `bin/UnRAR.exe` **7.23** estável + `bin/license.txt` (licença freeware), embarcados no `HqFriend.spec`; ADR-12, TECNICO §1.4/§5 e README atualizados; 240 testes passando e build conferido. Plano original: copiar o texto da licença do UnRAR (`license.txt` da instalação local do WinRAR, mesma origem do binário — Registro #009) para `bin/license.txt`, embarcá-lo no `HqFriend.spec` (`datas`) e registrar em TECNICO §1.4 e na ADR-12
 - [ ] **T11** — Montar a matriz de rastreabilidade (seção 5.6) e listar as lacunas encontradas
 - [ ] **T12** — Atualizar o `README.md` da raiz (atalhos: botão "Fechar" do leitor)
 - [x] **T13** — Atualizar a versão da spec no topo do `REQUISITOS.md` para `1.0.1` e os próximos IDs livres em `docs/README.md` (seção 5.5) · próximos IDs já estavam atualizados desde a abertura do pacote; a linha de reservas passou a listar só ADR-09 a ADR-13, ainda pendentes do Bloco 3
@@ -219,6 +219,12 @@ Execução em 4 blocos, com revisão do usuário ao fim de cada um: **Bloco 1** 
 | RF02-CA4: verificação automática | Cabeçalho coberto por teste; "abre maximizado" (`main.py`, `showMaximized()`) fica como verificação **manual** | `main()` não é exercitado pelos testes de UI | Matriz de rastreabilidade (Bloco 4) |
 | RF14-CA3 (Bloco 2): texto do delta | Aplicado com a redação corrigida do desvio acima e com "acompanha o redimensionamento da janela", já verificado por `test_botao_fechar_acompanha_o_redimensionamento` | Deixar no critério tudo o que o teste verifica | — (já aplicado) |
 | Seção 7 (Matriz) criada no Bloco 4 | Título e aviso "em construção" criados no Bloco 2; conteúdo continua no Bloco 4 (T11) | A convenção de verificação do cabeçalho, aplicada na T7, já aponta para a seção 7 | — (T11) |
+| T9: corrigir pontos específicos dos diagramas da ARQ §4 (itens 5 a 9) | Os três diagramas de sequência foram **reescritos** a partir do código; a §4.3 também mostra o caminho real do bookmark (memória → *debounce* → `flush()`), o `ExportWorker` e o botão "Fechar", e o §2 ganhou o nó `main.py` | Os diagramas tinham mais divergências do que as listadas (ex: `RServ->>Repo` direto, `export_current_view` chamado no `ExportService`) | — (já aplicado) |
+| T9, item 15: capas "em TECNICO §3" | Nova seção **TECNICO §3.7 Capas e Miniaturas** | As regras de capa estavam espalhadas e incompletas | — (já aplicado) |
+| T9: TECNICO §6.2 não estava na lista | Corrigido: trocar de HQ no seletor **não** chama `wait()` (interrompe sem bloquear e descarta as miniaturas pela geração); só fechar ou cancelar o diálogo aguarda os workers | Divergência encontrada ao revisar o código durante a T9 | — (já aplicado) |
+| T10b: copiar `License.txt` da instalação do WinRAR | **Não executado** | O arquivo é o EULA do WinRAR (avaliação, 40 dias), não a licença freeware do UnRAR. A cláusula 3a permite distribuir separadamente os componentes do UnRAR, mas distribuir o EULA do WinRAR como "licença do UnRAR" seria impreciso | Decisão do usuário; depois, ADR-12 (Consequências), TECNICO §1.4 e `HqFriend.spec` |
+| T10b, opção 1: binário e licença do pacote *UnRAR for Windows* | Binário **7.23 estável** extraído do instalador oficial do WinRAR 7.23; `license.txt` do pacote *UnRAR for Windows* | O pacote avulso traz hoje o **7.30 beta 2** e a RARLAB não oferece versões anteriores dele; para não distribuir uma beta numa correção, o binário veio da versão estável. Pacotes verificados pela assinatura da win.rar GmbH e extraídos sem executar | — (ADR-12 atualizada) |
+| T10b: só licença (sem trocar o binário) | Binário atualizado de **6.11 para 7.23** | Consequência da opção 1; risco de regressão coberto pelos testes de RAR e pela validação do executável no Bloco 4 | Bloco 4: validar `.cbr` no `.exe` |
 | RF12-CA4: duplo clique via `QTest.mouseDClick` | Teste usa `mouseClick` + `mouseDClick` | No Qt 6, `mouseDClick` sozinho não gera `itemDoubleClicked` (é como o utilitário de teste funciona; o duplo clique real funciona) | `specs/TECNICO.md` §7, armadilhas de teste (Bloco 3) |
 
 ## 8. Definição de Pronto

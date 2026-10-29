@@ -200,7 +200,7 @@ Não é preciso instalar Python nem nenhuma dependência.
 **Pré-requisitos**
 - Windows 11 (x64)
 - [Python 3.12+](https://www.python.org/downloads/) (64-bit)
-- `bin\UnRAR.exe`, já incluído no repositório. Para atualizá-lo, copie de `C:\Program Files\WinRAR\UnRAR.exe` ou baixe o *UnRAR for Windows* em [rarlab.com](https://www.rarlab.com/rar_add.htm).
+- `bin\UnRAR.exe` (UNRAR 7.23 freeware) e sua licença `bin\license.txt`, já incluídos no repositório. Para atualizá-los, siga o procedimento da [ADR-12](docs/adr/ADR-12-unrar-embarcado.md) (versão estável e assinada da [RARLAB](https://www.rarlab.com/rar_add.htm)).
 
 **Instalação**
 
@@ -237,7 +237,7 @@ Para gerar de novo as HQs de exemplo usadas nos testes (requer o WinRAR instalad
 .venv\Scripts\pyinstaller.exe --noconfirm --clean HqFriend.spec
 ```
 
-O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR.exe`, o ícone e o tema. Para distribuir, compacte a **pasta inteira** (o `HqFriend.exe` depende da subpasta `_internal\`).
+O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR.exe` (com sua licença), o ícone e o tema. Para distribuir, compacte a **pasta inteira** (o `HqFriend.exe` depende da subpasta `_internal\`).
 
 ---
 
@@ -246,7 +246,7 @@ O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR
 ```text
 HqFriend/
 ├── assets/                  # Ícone e tema Dark Mode (dark_theme.qss)
-├── bin/UnRAR.exe            # Binário embutido para leitura de .cbr
+├── bin/                     # UnRAR.exe (leitura de .cbr) + license.txt (licença freeware)
 ├── docs/                    # Specs vigentes (SDD), ADRs, pacotes de mudança e status
 ├── src/
 │   ├── main.py              # Ponto de entrada

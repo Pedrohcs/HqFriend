@@ -23,5 +23,6 @@ Aplicativo desktop (Windows 11, Python 3.12, PySide6) para organizar e ler HQs `
 * Executável: `.venv\Scripts\pyinstaller.exe --noconfirm --clean HqFriend.spec` → `dist\HqFriend\HqFriend.exe`
 
 ## Git
+* **Commits, MRs/PRs, merges, push e tags são feitos sempre pelo usuário.** O agente pode criar branches e consultar o estado do repositório (`status`, `diff`, `log`), deixando as alterações prontas no working tree para o usuário commitar.
 * Branches: `feat/FEAT-NN-<slug>` e `fix/FIX-NN-<slug>`, a partir da `main`.
 * Cada versão entregue recebe uma tag (`v1.Y` para features, `v1.Y.Z` para correções).
