@@ -3,7 +3,7 @@
 Aplicativo desktop (Windows 11, Python 3.12, PySide6) para organizar e ler HQs `.cbz`/`.cbr`. O projeto segue **Spec-Driven Development**: o processo completo está em [`docs/README.md`](docs/README.md) — leia-o antes de mudar comportamento.
 
 ## Regras do processo
-* **Spec antes do código.** Toda mudança de comportamento começa por um pacote em `docs/changes/` copiado de `docs/changes/_templates/` (`FEAT/` → `spec.md`, `plan.md`, `tasks.md`; `FIX/` → `fix.md`). Não implemente sem o `spec.md`/`fix.md` aprovado pelo usuário.
+* **Spec antes do código.** Toda mudança de comportamento começa por um pacote em `docs/changes/` copiado de `docs/changes/_templates/` (`FEAT/` → `spec.md`, `plan.md`, `tasks.md`; `FIX/` → `fix.md`). Não implemente sem o `spec.md`/`fix.md` aprovado pelo usuário. A pasta do pacote leva só tipo + número (`docs/changes/FEAT-14/`, `docs/changes/FIX-02/`); o título fica dentro do documento.
 * **Classifique todo bug** antes de corrigir: Tipo A (código diverge da spec), Tipo B (spec errada) ou, se o comportamento segue a spec, é uma FEAT.
 * **`docs/specs/` é a verdade vigente** e deve descrever o código da `main`. Ao concluir um pacote, aplique o delta e os desvios de implementação em `docs/specs/` e `docs/adr/` — registrar o desvio só no STATUS não basta.
 * **IDs nunca são reaproveitados.** Consulte e atualize a tabela "Próximos IDs Livres" em `docs/README.md`. Requisitos removidos viram `Obsoleto (FEAT-NN)`; ADRs revistas viram `Substituída por ADR-NN`.

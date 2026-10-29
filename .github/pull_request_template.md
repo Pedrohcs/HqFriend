@@ -1,6 +1,6 @@
 ## Pacote
-<!-- FEAT-NN ou FIX-NN, com link para docs/changes/<pacote>/ -->
-* **Pacote:** `FEAT-NN` / `FIX-NN` — `docs/changes/<pasta>/`
+<!-- FEAT-NN ou FIX-NN, com link para a pasta do pacote -->
+* **Pacote:** `FEAT-NN` / `FIX-NN` — `docs/changes/FEAT-NN/` ou `docs/changes/FIX-NN/`
 * **Tipo de FIX (se aplicável):** A (código diverge da spec) / B (spec corrigida)
 
 ## Resumo

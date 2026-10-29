@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). Documentação reorganizada para manutenção contínua. Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-01`.
+**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** especificado e aguardando aprovação para implementação (alvo: v1.0.1).
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -27,6 +27,7 @@
 | **FEAT-11** | Fase 5 (v1.0) | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
 | **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
+| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `pendente` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Aguardando aprovação do `fix.md` |
 
 ---
 
@@ -252,3 +253,16 @@
     * **Nova política:** versionamento e migração do `state.json` (`ARQUITETURA.md` §3.3), a ser implementada na primeira mudança de schema.
     * Quadro de features ganhou as colunas **Fase / Versão** e **Pacote**. `CLAUDE.md` e `.github/pull_request_template.md` criados com o processo e o checklist de PR.
 
+### [Registro #021] — 2026-10-29 — FIX-01 Especificado (Auditoria Spec × Código)
+* **Responsável:** Tech Lead / Analista de Requisitos Sênior
+* **Etapa Atual:** `FIX-01` especificado em `docs/changes/FIX-01-sincronizacao-spec-v1.0/fix.md`, aguardando aprovação para iniciar a implementação (alvo: v1.0.1).
+* **Resumo das Mudanças:**
+    * **Auditoria spec × código** encontrou: o "botão de fechar" do leitor citado no RF14 não foi implementado; a gravação do bookmark está descrita como *throttle*, mas foi implementada como *debounce*; diagramas e textos citam componentes e chamadas inexistentes (`ArchiveReaderAdapter`, classe `FileSystemScanner`, `initialize_library()`, `save_state()`, assinaturas antigas de sinais); comportamentos visíveis ao usuário sem requisito (releitura, página ilegível, estados vazios, indicador de página, título da janela, tema escuro); estratégia de testes perdida no arquivamento do Registro #020; decisões de stack, empacotamento, `UnRAR.exe` e miniaturas sem ADR; licença do `UnRAR.exe` não distribuída junto ao binário.
+    * **Decisões do usuário:** **QA-05** — implementar o botão "Fechar" no leitor (FIX Tipo A); **QA-06** — manter a gravação do bookmark 500 ms após a última virada (só a spec e o comentário do código mudam).
+    * **IDs reservados pelo FIX-01:** RF21, RNF08, QA-02 a QA-06 (QA-02 a QA-04 retroativas, do Registro #002), ADR-09 a ADR-13.
+    * `FIX-01` $\rightarrow$ `pendente`.
+
+### [Registro #022] — 2026-10-29 — Convenção de Nome das Pastas de Pacote
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` especificado em `docs/changes/FIX-01/fix.md`, aguardando aprovação para iniciar a implementação (alvo: v1.0.1).
+* **Resumo das Mudanças:** por decisão do usuário, as pastas de pacote passam a ter apenas tipo + número (`FEAT-NN` / `FIX-NN`), sem título; o título fica só dentro do `spec.md` / `fix.md` e no quadro. A pasta citada no Registro #021 foi renomeada de `docs/changes/FIX-01-sincronizacao-spec-v1.0/` para `docs/changes/FIX-01/`. Regra registrada em `docs/README.md` (Regras da Spec Vigente, item 6), `CLAUDE.md` e no template de PR.

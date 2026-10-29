@@ -19,30 +19,31 @@ docs/
 │   ├── _templates/
 │   │   ├── FEAT/           # spec.md, plan.md, tasks.md
 │   │   └── FIX/            # fix.md
-│   └── FEAT-NN-<slug>/     # um pacote por mudança
+│   ├── FEAT-NN/            # um pacote por mudança: só tipo + número;
+│   └── FIX-NN/             # o título fica dentro do spec.md / fix.md
 └── archive/                # pacotes concluídos, por versão (somente leitura)
     └── v1.0/               # backlog original FEAT-01..13
 ```
 
 ## Próximos IDs Livres
 
-Atualize esta tabela ao reservar um ID (IDs **nunca** são reaproveitados, nem de itens cancelados ou obsoletos).
+Atualize esta tabela ao reservar um ID (IDs **nunca** são reaproveitados, nem de itens cancelados ou obsoletos). Um pacote reserva seus IDs quando o `spec.md` / `fix.md` é criado. Reservas atuais: **FIX-01** → RF21, RNF08, QA-02 a QA-06, ADR-09 a ADR-13.
 
 | Tipo | Próximo | Onde fica |
 | :--- | :--- | :--- |
-| Feature | `FEAT-14` | `changes/FEAT-14-<slug>/` |
-| Correção | `FIX-01` | `changes/FIX-01-<slug>/` |
-| Requisito funcional | `RF21` | `specs/REQUISITOS.md` §2 |
-| Requisito não funcional | `RNF08` | `specs/REQUISITOS.md` §3 |
+| Feature | `FEAT-14` | `changes/FEAT-14/` |
+| Correção | `FIX-02` | `changes/FIX-02/` |
+| Requisito funcional | `RF22` | `specs/REQUISITOS.md` §2 |
+| Requisito não funcional | `RNF09` | `specs/REQUISITOS.md` §3 |
 | História de usuário | `US14` | `specs/REQUISITOS.md` §4 |
-| Questão de decisão | `QA-02` | `spec.md` do pacote → `specs/REQUISITOS.md` §6 |
-| Decisão arquitetural | `ADR-09` | `adr/ADR-09-<slug>.md` |
+| Questão de decisão | `QA-07` | `spec.md` do pacote → `specs/REQUISITOS.md` §6 |
+| Decisão arquitetural | `ADR-14` | `adr/ADR-14-<slug>.md` |
 
 ## Ciclo de uma FEAT
 
 | # | Etapa | Saída | Portão para avançar |
 | :---: | :--- | :--- | :--- |
-| 1 | **Especificar** | `changes/FEAT-NN-<slug>/spec.md` (copiado de `_templates/FEAT/`) com o **delta**: ADICIONADO / MODIFICADO / REMOVIDO | Todas as `QA-NN` decididas; delta aprovado |
+| 1 | **Especificar** | `changes/FEAT-NN/spec.md` (copiado de `_templates/FEAT/`) com o **delta**: ADICIONADO / MODIFICADO / REMOVIDO | Todas as `QA-NN` decididas; delta aprovado |
 | 2 | **Planejar** | `plan.md` (impacto por camada, `state.json`, ADRs, testes, specs a atualizar) e `tasks.md` | Plano revisado |
 | 3 | **Implementar** | Código + testes na branch `feat/FEAT-NN-<slug>`; testes citam `RFxx-CAn`; desvios anotados em `tasks.md` | `pytest` passando por completo |
 | 4 | **Sincronizar** | Delta aplicado em `specs/`, desvios levados à spec, ADRs criadas ou substituídas, `STATUS_PROJETO.md` atualizado | Spec vigente descreve o código da branch |
@@ -67,7 +68,8 @@ Todo FIX exige um teste de regressão que **falha sem a correção** e passa com
 3. **Requisitos não são apagados.** Ao remover um requisito, ele passa a `Obsoleto (FEAT-NN)`, mantendo o texto.
 4. **ADRs não são reescritas.** Uma decisão revista gera uma nova ADR, e a antiga passa a `Substituída por ADR-NN`.
 5. **Mudança no `state.json` segue `ARQUITETURA.md` §3.3** (versão + migração testada).
-6. **Rastreabilidade nos testes.** Testes novos citam o critério que cobrem (`# RF07-CA2`, `# FIX-03 / RF16-CA2`).
+6. **Nome das pastas de pacote:** apenas tipo + número (`changes/FEAT-14/`, `changes/FIX-02/`), também no arquivo (`archive/v1.1/FEAT-14/`). O título da mudança fica só dentro do `spec.md` / `fix.md` e no quadro do STATUS.
+7. **Rastreabilidade nos testes.** Testes novos citam o critério que cobrem (`# RF07-CA2`, `# FIX-03 / RF16-CA2`).
 
 ## Versionamento
 
