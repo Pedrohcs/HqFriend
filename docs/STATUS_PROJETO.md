@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** em andamento — Bloco 4/4: T11 e T12 concluídas e lacunas de teste fechadas; aguardando a validação manual do executável (roteiro M2) para concluir (alvo v1.0.1).
+**Etapa Atual:** ✅ **v1.0.1 entregue** — v1.0 (FEAT-01 a FEAT-13) + **FIX-01** concluído. Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-02`.
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -27,7 +27,7 @@
 | **FEAT-11** | Fase 5 (v1.0) | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
 | **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
-| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `em andamento` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Blocos 1–3/4 ✅; Bloco 4: T11–T12 ✅, lacunas cobertas — aguardando validação manual do `.exe` |
+| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF15, RF19, RF21, RNF06, RNF07, RNF08 | `concluida` | [FIX-01](archive/v1.0.1/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). 4 blocos concluídos; executável validado pelo usuário (roteiro M2) |
 
 ---
 
@@ -331,3 +331,15 @@
     * Corrigido o `SyntaxWarning: invalid escape sequence '\H'` em `tests/ui/test_reader_view.py`.
     * **Matriz:** 84 critérios — 74 automáticos, 6 automáticos com complemento manual, 4 manuais e **0 lacunas**.
     * **245 testes passando**, sem avisos; `tests/ui` repetido 3 vezes sem falhas.
+
+### [Registro #030] — 2026-10-29 — FIX-01 Concluído (v1.0.1)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** ✅ **v1.0.1 entregue.** Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-02`.
+* **Resumo das Mudanças:**
+    * **Validação manual (roteiro M2)** confirmada pelo usuário no executável `dist\HqFriend\HqFriend.exe`: leitura de `.cbr` real com o UnRAR 7.23 e de `.cbz` sem janela de console, botão "Fechar" (`✕`), `Ctrl + P` em `Imagens\HQs`, bloqueio da segunda instância, tema escuro e pastas do sistema. Fecha RNF01-CA1/CA2, RNF04-CA5, RNF07-CA1, RNF08-CA1/CA2 e o RF14-CA3 no executável.
+    * **Definição de Pronto** do `fix.md` cumprida integralmente.
+    * **Entregas do FIX-01:** botão "Fechar" no leitor (QA-05); spec vigente sincronizada com o código da v1.0 (requisitos, arquitetura, técnico, QA-02 a QA-06, RF21, RNF08, ADR-09 a ADR-13); UnRAR 6.11 $\rightarrow$ 7.23 estável com a licença freeware embarcada; matriz de rastreabilidade com 84 critérios e 0 lacunas; **245 testes** passando, sem avisos.
+    * **Pacote arquivado** em `docs/archive/v1.0.1/FIX-01/`.
+    * **A cargo do usuário:** commit de fechamento, tag `v1.0.1` e MR para a `main` (a branch `fix/FIX-01-sincronizacao-spec-v1.0` também leva as FEAT-07 a FEAT-13, ainda não integradas à `main`).
+    * `FIX-01` $\rightarrow$ `concluida`.
+

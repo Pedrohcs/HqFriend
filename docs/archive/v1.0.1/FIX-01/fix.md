@@ -1,6 +1,6 @@
 # FIX-01 — Sincronização da Spec com o Código da v1.0 e Botão de Fechar do Leitor
 
-* **Status:** `em andamento`
+* **Status:** `concluida` (2026-10-29)
 * **Branch:** `fix/FIX-01-sincronizacao-spec-v1.0`
 * **Severidade:** `média` — nenhum defeito de dados ou de função principal; a spec vigente não descreve fielmente o sistema entregue, o que invalida o SDD como base para as próximas mudanças.
 * **Versão afetada:** v1.0 · **Corrigido em:** v1.0.1
@@ -185,7 +185,7 @@ Tabela com **todos** os critérios `RFxx-CAn` / `RNFxx-CAn`: `Critério | Verifi
 
 ## 6. Teste de Regressão
 * **Parte de código:** `tests/ui/test_reader_view.py::test_botao_fechar_volta_para_a_serie` — comentário `# FIX-01 / RF14-CA3`. Verifica que o botão existe, está visível com uma HQ aberta, que o clique emite `close_requested` e que, na `MainWindow`, a Tela da Série volta a ser exibida com o bookmark gravado.
-- [ ] O teste **falha** sem a correção (o botão não existe) e **passa** com ela.
+- [x] O teste **falha** sem a correção (o botão não existe) e **passa** com ela. · Confirmado no Bloco 1: `AttributeError: 'ReaderView' object has no attribute 'close_button'` antes da T2.
 * **Trava obsoleta:** `test_trava_de_processo_encerrado_nao_bloqueia_abertura` — `# FIX-01 / RNF07-CA1` (ou registro como manual, ver 4.1-3).
 * **Parte de spec:** a matriz da seção 5.6 é a verificação. Nenhum critério pode ficar sem linha.
 
@@ -231,13 +231,14 @@ Execução em 4 blocos, com revisão do usuário ao fim de cada um: **Bloco 1** 
 | RF12-CA4: duplo clique via `QTest.mouseDClick` | Teste usa `mouseClick` + `mouseDClick` | No Qt 6, `mouseDClick` sozinho não gera `itemDoubleClicked` (é como o utilitário de teste funciona; o duplo clique real funciona) | `specs/TECNICO.md` §7, armadilhas de teste (Bloco 3) |
 
 ## 8. Definição de Pronto
-- [ ] Teste de regressão do botão adicionado (falha sem a correção) e `pytest` passando por completo
-- [ ] Delta da seção 5 aplicado em `specs/` e `adr/`, com desvios da seção 7 levados à spec
-- [ ] Matriz de rastreabilidade sem critérios órfãos (lacunas decididas)
-- [ ] Executável gerado e o botão "Fechar" conferido manualmente (RNF08-CA1 no mesmo roteiro)
-- [ ] `STATUS_PROJETO.md`: quadro atualizado e novo registro no histórico
-- [ ] Pasta do pacote movida para `docs/archive/v1.0.1/`; tag `v1.0.1`
+- [x] Teste de regressão do botão adicionado (falha sem a correção) e `pytest` passando por completo · 245 testes, sem avisos
+- [x] Delta da seção 5 aplicado em `specs/` e `adr/`, com desvios da seção 7 levados à spec · Blocos 2 e 3, RF15-CA2 no Bloco 4
+- [x] Matriz de rastreabilidade sem critérios órfãos (lacunas decididas) · 84 critérios, 0 lacunas
+- [x] Executável gerado e o botão "Fechar" conferido manualmente (RNF08-CA1 no mesmo roteiro) · roteiro **M2 confirmado pelo usuário** em 2026-10-29 (`.cbr` real com o UnRAR 7.23, `.cbz`, botão `✕`, `Ctrl + P`, segunda instância, tema e pastas do sistema)
+- [x] `STATUS_PROJETO.md`: quadro atualizado e novo registro no histórico · registros #021–#030
+- [x] Pasta do pacote movida para `docs/archive/v1.0.1/` · `docs/archive/v1.0.1/FIX-01/`; a tag `v1.0.1` é criada pelo usuário junto com o commit de fechamento
 
 ## 9. Aprovação
 - [x] Decisões QA-05 e QA-06 tomadas pelo usuário (2026-10-29)
 - [x] Este documento revisado e aprovado para implementação (data: 2026-10-29)
+- [x] Entrega validada pelo usuário — roteiro M2 confirmado e FIX-01 dado como concluído com sucesso (2026-10-29)
