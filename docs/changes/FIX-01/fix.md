@@ -203,20 +203,22 @@ Execução em 4 blocos, com revisão do usuário ao fim de cada um: **Bloco 1** 
 - [x] **T6** — `pytest` completo passando (registrar o total) · **240 testes** (232 + 8 novos); `tests/ui` repetido 5 vezes sem falhas
 
 ### Documentação
-- [ ] **T7** — Aplicar a seção 5.1 em `specs/REQUISITOS.md` (RF02, RF06, RF12, RF13, RF14, RF19 modificados; RF21 e RNF08 adicionados; convenção de verificação)
-- [ ] **T8** — Aplicar a seção 5.2 (QA-02 a QA-06)
+- [x] **T7** — Aplicar a seção 5.1 em `specs/REQUISITOS.md` (RF02, RF06, RF12, RF13, RF14, RF19 modificados; RF21 e RNF08 adicionados; convenção de verificação)
+- [x] **T8** — Aplicar a seção 5.2 (QA-02 a QA-06)
 - [ ] **T9** — Aplicar os itens 1 a 20 da seção 5.3 em `ARQUITETURA.md` e `TECNICO.md`
 - [ ] **T10** — Criar ADR-09 a ADR-13 e atualizar o índice da ARQ §5
 - [ ] **T10b** — Copiar o texto da licença do UnRAR (`license.txt` da instalação local do WinRAR, mesma origem do binário — Registro #009) para `bin/license.txt`, embarcá-lo no `HqFriend.spec` (`datas`) e registrar em TECNICO §1.4 e na ADR-12
 - [ ] **T11** — Montar a matriz de rastreabilidade (seção 5.6) e listar as lacunas encontradas
 - [ ] **T12** — Atualizar o `README.md` da raiz (atalhos: botão "Fechar" do leitor)
-- [ ] **T13** — Atualizar a versão da spec no topo do `REQUISITOS.md` para `1.0.1` e os próximos IDs livres em `docs/README.md` (seção 5.5)
+- [x] **T13** — Atualizar a versão da spec no topo do `REQUISITOS.md` para `1.0.1` e os próximos IDs livres em `docs/README.md` (seção 5.5) · próximos IDs já estavam atualizados desde a abertura do pacote; a linha de reservas passou a listar só ADR-09 a ADR-13, ainda pendentes do Bloco 3
 
 ### Desvios em Relação a Este Plano
 | Planejado | Implementado | Motivo | Doc a atualizar |
 | :--- | :--- | :--- | :--- |
 | RF14-CA3: "depois do clique o teclado continua controlando o leitor até ele fechar" | O botão não recebe foco (`Qt.NoFocus`): as teclas nunca saem do leitor, inclusive após passar o mouse ou clicar perto do botão | A redação original não era verificável (o clique fecha o leitor) | `specs/REQUISITOS.md` RF14-CA3 (Bloco 2): "o botão não recebe foco do teclado; as teclas de navegação continuam indo para o leitor" |
 | RF02-CA4: verificação automática | Cabeçalho coberto por teste; "abre maximizado" (`main.py`, `showMaximized()`) fica como verificação **manual** | `main()` não é exercitado pelos testes de UI | Matriz de rastreabilidade (Bloco 4) |
+| RF14-CA3 (Bloco 2): texto do delta | Aplicado com a redação corrigida do desvio acima e com "acompanha o redimensionamento da janela", já verificado por `test_botao_fechar_acompanha_o_redimensionamento` | Deixar no critério tudo o que o teste verifica | — (já aplicado) |
+| Seção 7 (Matriz) criada no Bloco 4 | Título e aviso "em construção" criados no Bloco 2; conteúdo continua no Bloco 4 (T11) | A convenção de verificação do cabeçalho, aplicada na T7, já aponta para a seção 7 | — (T11) |
 | RF12-CA4: duplo clique via `QTest.mouseDClick` | Teste usa `mouseClick` + `mouseDClick` | No Qt 6, `mouseDClick` sozinho não gera `itemDoubleClicked` (é como o utilitário de teste funciona; o duplo clique real funciona) | `specs/TECNICO.md` §7, armadilhas de teste (Bloco 3) |
 
 ## 8. Definição de Pronto

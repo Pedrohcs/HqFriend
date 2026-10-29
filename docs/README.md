@@ -27,7 +27,7 @@ docs/
 
 ## Próximos IDs Livres
 
-Atualize esta tabela ao reservar um ID (IDs **nunca** são reaproveitados, nem de itens cancelados ou obsoletos). Um pacote reserva seus IDs quando o `spec.md` / `fix.md` é criado. Reservas atuais: **FIX-01** → RF21, RNF08, QA-02 a QA-06, ADR-09 a ADR-13.
+Atualize esta tabela ao reservar um ID (IDs **nunca** são reaproveitados, nem de itens cancelados ou obsoletos). Um pacote reserva seus IDs quando o `spec.md` / `fix.md` é criado. Reservas atuais: **FIX-01** → ADR-09 a ADR-13 (RF21, RNF08 e QA-02 a QA-06 já aplicados em `specs/REQUISITOS.md`).
 
 | Tipo | Próximo | Onde fica |
 | :--- | :--- | :--- |

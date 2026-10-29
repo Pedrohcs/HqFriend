@@ -2,9 +2,10 @@
 
 > **Spec vigente.** Este documento descreve o comportamento **atual** do sistema na branch `main` e deve estar sempre alinhado ao código. Mudanças entram por um pacote em `docs/changes/` (ver `docs/README.md`) e são aplicadas aqui na etapa de **Sincronização**.
 >
-> * **Versão da spec:** `1.0` (2026-10-24) — escopo entregue pelas FEAT-01 a FEAT-13.
+> * **Versão da spec:** `1.0.1` (2026-10-29) — escopo entregue pelas FEAT-01 a FEAT-13 e pelo FIX-01.
 > * **Convenções de ID:** `RFxx` / `RNFxx` / `USxx` nunca são reaproveitados. Cada requisito tem critérios de aceite próprios (`RFxx-CAn`), referenciados nos testes e nos pacotes de FIX. Requisitos removidos permanecem no documento com status `Obsoleto (FEAT-NN)`.
 > * **Status de requisito:** `Ativo` | `Obsoleto (FEAT-NN)`. A linha **Origem** indica o pacote que criou o requisito e os que o alteraram depois.
+> * **Verificação:** cada critério é verificado de forma **automática** (teste pytest) ou **manual** (roteiro no executável). A seção 7 (Matriz de Rastreabilidade) liga cada critério à sua verificação. Testes novos citam o critério (`# RF14-CA3`).
 
 ## 1. Visão Geral do Sistema
 O **HqFriend** é uma aplicação desktop local voltada para o gerenciamento de acervo e leitura de histórias em quadrinhos nos formatos `.cbr` e `.cbz`. O sistema opera diretamente sobre o sistema de arquivos local do usuário, organizando pastas como "Séries" e mantendo o estado de progresso, capas customizadas e preferências persistidos localmente em formato estruturado (`JSON`).
@@ -28,11 +29,13 @@ O sistema deve permitir ao usuário selecionar uma pasta local do computador par
 * **RF01-CA2:** Trocar o diretório raiz não apaga o progresso existente: séries e arquivos com o mesmo nome na nova raiz exibem o progresso já registrado (QA-01).
 
 #### RF02 — Inicialização na Tela Principal
-`Ativo` · Origem: v1.0 (FEAT-08)
+`Ativo` · Origem: v1.0 (FEAT-08), FIX-01
 
 Sempre que o sistema for aberto, ele deve exibir diretamente a "Tela Inicial" (Listagem de Séries), carregando automaticamente o diretório raiz previamente configurado no arquivo de memória. Caso o diretório configurado não exista mais (ex: unidade externa desconectada), o sistema deve exibir a Tela Inicial convidando a selecionar uma pasta, **sem apagar** o estado salvo.
 * **RF02-CA1:** Abrir o aplicativo sempre exibe a Tela Inicial carregando as séries do `root_directory` salvo.
 * **RF02-CA2:** Se a pasta configurada não existir, a Tela Inicial exibe o convite para selecionar uma pasta e o `state.json` permanece intacto.
+* **RF02-CA3:** Os estados vazios da Tela Inicial exibem orientação e o botão "Selecionar pasta": sem pasta configurada ("Selecione a pasta onde estão suas HQs para começar."), pasta não encontrada (exibe o caminho e "Reconecte a unidade ou selecione outra pasta.") e pasta sem séries (exibe o caminho e "Cada subpasta com arquivos .cbr ou .cbz é uma série.").
+* **RF02-CA4:** O cabeçalho da Tela Inicial exibe a pasta raiz atual (caminho completo no *tooltip*, sem impor largura mínima à janela) e o aplicativo abre maximizado.
 
 #### RF03 — Reconhecimento de Séries (Nível Único)
 `Ativo` · Origem: v1.0 (FEAT-04)
@@ -63,22 +66,25 @@ Séries (Tela Inicial) e obras (Tela da Série) devem ser exibidas em ordem alfa
 * **RF18-CA2:** A mesma regra é aplicada às séries, às HQs de cada série e às páginas dentro dos arquivos (ADR-01).
 
 #### RF19 — Atualização da Biblioteca
-`Ativo` · Origem: v1.0 (FEAT-06, FEAT-08, FEAT-10)
+`Ativo` · Origem: v1.0 (FEAT-06, FEAT-08, FEAT-10), FIX-01
 
 O sistema deve reescanear o diretório raiz: (a) na inicialização; (b) ao trocar de diretório raiz; (c) ao retornar da Tela da Série para a Tela Inicial; (d) sob demanda, pela tecla `F5` ou pelo botão **"Atualizar"** na Tela Inicial. A varredura deve refletir arquivos adicionados ou removidos sem necessidade de reiniciar o sistema.
 * **RF19-CA1:** Adicionar um `.cbz` a uma série com o aplicativo aberto e pressionar `F5` (ou "Atualizar") atualiza o contador sem reiniciar.
 * **RF19-CA2:** Voltar da Tela da Série para a Tela Inicial dispara uma nova varredura.
 * **RF19-CA3:** Uma varredura solicitada durante outra é enfileirada uma única vez; o resultado de uma raiz antiga é descartado.
+* **RF19-CA4:** Enquanto a varredura está em andamento, a Tela Inicial exibe "Atualizando biblioteca…".
 
 ### 2.2. Gerenciamento de Status e Progresso de Leitura
 
 #### RF06 — Persistência de Página Atual (Bookmark)
-`Ativo` · Origem: v1.0 (FEAT-11)
+`Ativo` · Origem: v1.0 (FEAT-11), FIX-01
 
 Caso o usuário feche uma HQ antes de finalizá-la, o sistema deve salvar a última página visualizada e retomar a leitura exatamente dessa página quando o arquivo for reaberto. Ao reabrir uma HQ com status "Lida", a leitura deve iniciar na **primeira página** (releitura).
 * **RF06-CA1:** Fechar uma HQ na metade (via `ESC`, ou fechando o aplicativo) e abri-la novamente retoma exatamente da página onde parou.
 * **RF06-CA2:** Uma HQ "Lida" reabre na página 1, inclusive quando foi concluída em modo de página dupla.
 * **RF06-CA3:** Um bookmark fora do intervalo de páginas (ex: arquivo substituído por versão menor) reabre na página 1.
+* **RF06-CA4:** Durante a releitura de uma HQ "Lida", ela permanece "Lida" e o contador da série não muda; reabri-la novamente recomeça na página 1.
+* **RF06-CA5:** Durante a leitura, o bookmark é gravado 500 ms após a última mudança de página e, de imediato, ao fechar a HQ, ao concluí-la e ao encerrar o aplicativo (QA-06).
 
 #### RF07 — Marcação Automática de Obra Lida
 `Ativo` · Origem: v1.0 (FEAT-11)
@@ -132,7 +138,7 @@ Na Tela Inicial, ao clicar com o botão direito sobre uma Série, o sistema deve
 * **RF11-CA3:** "Restaurar capa padrão" só aparece quando há capa customizada; ao acioná-la, a capa padrão é regerada e a referência customizada é removida do `state.json`.
 
 #### RF12 — Fluxo de Escolha de Capa em 2 Etapas (Seletor de HQ + Galeria de Páginas)
-`Ativo` · Origem: v1.0 (FEAT-07, FEAT-09)
+`Ativo` · Origem: v1.0 (FEAT-07, FEAT-09), FIX-01
 
 Ao acionar "Selecionar imagem de capa", o sistema deve:
 1. Perguntar ao usuário **qual HQ (`.cbr`/`.cbz`)** daquela série ele deseja pré-visualizar;
@@ -142,14 +148,16 @@ Critérios de aceite:
 * **RF12-CA1:** Apenas as páginas da HQ selecionada no passo 1 são extraídas (nunca todas as HQs da série).
 * **RF12-CA2:** A interface não trava durante o carregamento das miniaturas; fechar o diálogo ou trocar de HQ antes do fim interrompe o carregamento e libera o arquivo.
 * **RF12-CA3:** Ao confirmar a página, o arquivo em `covers\` e o `state.json` são atualizados imediatamente e o card da série na Tela Inicial exibe a nova capa.
+* **RF12-CA4:** O passo 1 abre com a HQ da capa atual já selecionada (ou a primeira HQ, se a capa for a padrão); no passo 2, "Definir como capa" só fica habilitado com uma página selecionada, e o duplo clique numa miniatura confirma.
 
 ### 2.4. Leitor Integrado de HQs e Atalhos
 
 #### RF13 — Abertura por Duplo Clique
-`Ativo` · Origem: v1.0 (FEAT-10, FEAT-11)
+`Ativo` · Origem: v1.0 (FEAT-10, FEAT-11), FIX-01
 
 Ao dar um duplo clique sobre um arquivo `.cbr` ou `.cbz`, o sistema deve abrir o leitor interno carregando a HQ selecionada.
 * **RF13-CA1:** O duplo clique em uma HQ válida abre o leitor com o arquivo selecionado (na página definida pelo RF06).
+* **RF13-CA2:** Durante a leitura, o título da janela exibe `<nome do arquivo> — HqFriend`; ao fechar o leitor, volta a `HqFriend`.
 
 #### RF20 — Tratamento de Arquivo Inválido
 `Ativo` · Origem: v1.0 (FEAT-05, FEAT-10, FEAT-11)
@@ -158,17 +166,27 @@ Caso a HQ esteja corrompida, protegida por senha ou não contenha nenhuma imagem
 * **RF20-CA1:** Arquivos inexistentes, vazios, corrompidos, protegidos por senha (arquivo ou cabeçalho), sem imagens ou de formato desconhecido são rejeitados com `InvalidComicError`.
 * **RF20-CA2:** O duplo clique em uma HQ inválida exibe mensagem de erro, permanece na Tela da Série e não altera o status nem o bookmark da HQ.
 
+#### RF21 — Tratamento de Página Ilegível
+`Ativo` · Origem: FIX-01 (comportamento entregue na v1.0, FEAT-11)
+
+Se uma página de uma HQ válida não puder ser decodificada, o leitor deve exibir um quadro substituto com o texto "Página ilegível" no lugar dela, registrar o problema em log e continuar permitindo a navegação. A HQ não é considerada inválida (RF20) por causa de uma página isolada.
+* **RF21-CA1:** Uma página com bytes de imagem corrompidos é exibida como o quadro "Página ilegível", e as demais páginas continuam navegáveis.
+* **RF21-CA2:** A falha é registrada em `hqfriend.log` como aviso, sem mensagem modal ao usuário.
+* **RF21-CA3:** Chegar à última página continua marcando a HQ como "Lida" (RF07), mesmo que alguma página tenha sido ilegível.
+
 #### RF14 — Navegação de Páginas
-`Ativo` · Origem: v1.0 (FEAT-11)
+`Ativo` · Origem: v1.0 (FEAT-11), FIX-01
 
 Durante a leitura, o sistema deve permitir:
 * **Seta Direita (`→`) ou `Barra de Espaço`:** Avançar para a próxima página (ou próximo par de páginas). Na última página, não faz nada.
 * **Seta Esquerda (`←`):** Voltar para a página anterior (ou par de páginas anterior). Na primeira página, não faz nada.
-* **Tecla `ESC` (ou botão de fechar):** Encerrar a visualização da HQ e retornar à listagem da série.
+* **Tecla `ESC` ou botão "Fechar" (`✕`) do leitor:** Encerrar a visualização da HQ e retornar à listagem da série.
 
 Critérios de aceite:
 * **RF14-CA1:** `→`/`Espaço` avançam e `←` volta uma página (ou um par, no modo duplo); nos limites, nada acontece.
 * **RF14-CA2:** `ESC` grava o bookmark, fecha a HQ e volta à Tela da Série com status e contadores atualizados.
+* **RF14-CA3:** O leitor exibe um botão "Fechar" (`✕`, tooltip `Fechar (Esc)`) no canto superior direito, que acompanha o redimensionamento da janela; clicar nele tem o mesmo efeito do `ESC` (RF14-CA2). O botão não recebe foco do teclado: as teclas de navegação continuam indo para o leitor.
+* **RF14-CA4:** Durante a leitura, um indicador sobreposto mostra a posição atual: `Pág. N / Total` no modo único e `Págs. N–M / Total` no modo duplo.
 
 #### RF15 — Controle de Zoom (`Ctrl + Scroll`)
 `Ativo` · Origem: v1.0 (FEAT-11)
@@ -263,6 +281,13 @@ Erros e exceções não tratadas devem ser registrados em arquivo de log rotativ
 
 Apenas uma instância do sistema pode estar em execução por vez, evitando gravações concorrentes no `state.json`. Ao tentar abrir uma segunda instância, o sistema deve avisar o usuário e encerrar a nova instância.
 * **RNF07-CA1:** Abrir uma segunda instância exibe aviso e encerra a nova instância; a trava de um processo encerrado de forma anormal não impede a próxima abertura.
+
+#### RNF08 — Identidade Visual em Tema Escuro
+`Ativo` · Origem: FIX-01 (comportamento entregue na v1.0, FEAT-08)
+
+A interface deve usar um tema escuro único, definido em uma folha de estilos embarcada (`assets/styles/dark_theme.qss`) sobre o estilo Qt `Fusion`: fundo da aplicação `#121212`, fundo do leitor `#000000`, superfícies `#1e1e1e`/`#2a2a2a` e cor de destaque âmbar `#e5a00d` para ações primárias e seleção.
+* **RNF08-CA1:** Telas, diálogos e menus usam o tema escuro tanto no código-fonte quanto no executável (a folha de estilos é resolvida via `get_resource_path`).
+* **RNF08-CA2:** Os status usam cores consistentes em toda a interface: "Lida" em verde, "Em andamento" em âmbar e "Não lida" em cinza.
 
 ---
 
@@ -376,7 +401,18 @@ graph TD
 | ID | Questão | Decisão | Alternativas Descartadas |
 | :--- | :--- | :--- | :--- |
 | **QA-01** | **Identificação do progresso ao trocar de diretório raiz.** | **Opção C (decidida em 2026-10-24):** estado único, chaveado apenas por *nome da pasta da série* + *nome do arquivo*, sem reset ao trocar de raiz. Mover a pasta raiz preserva o progresso. Entradas de arquivos ausentes no disco são mantidas no JSON, mas ignoradas nos contadores. | **A.** Estado separado por diretório raiz (mover a pasta perderia o progresso). **B.** Zerar o estado ao trocar de raiz (perderia o histórico). |
+| **QA-02** | Formato do contador quando nenhuma obra foi lida. | **Decidida em 2026-10-24 (retroativa, FIX-01):** sempre `0 / Y obras` (RF04). | Não registradas na época. |
+| **QA-03** | Montagem da imagem de página dupla no `Ctrl + P` quando as páginas têm alturas diferentes. | **Decidida em 2026-10-24 (retroativa, FIX-01):** unir sem redimensionar, centralizando verticalmente a menor sobre fundo preto (RF17). | Não registradas na época. |
+| **QA-04** | Caminhos de dados e de exportação. | **Decidida em 2026-10-24 (retroativa, FIX-01):** pastas conhecidas do Windows `%DOCUMENTOS%` / `%IMAGENS%`, respeitando OneDrive (ADR-05). | Caminhos fixos com o nome do usuário (quebram em outra máquina e com o OneDrive). |
+| **QA-05** | O leitor deve ter botão de fechar, como cita o RF14? | **Decidida em 2026-10-29 (FIX-01):** sim — botão `✕` sobreposto, com o mesmo efeito do `ESC` (RF14-CA3). | Remover o botão da spec e manter só o `ESC` (pior para quem usa só o mouse). |
+| **QA-06** | Momento de gravação do bookmark durante a leitura. | **Decidida em 2026-10-29 (FIX-01):** manter o implementado — grava 500 ms após a última virada (*debounce*), e de imediato ao fechar, concluir ou sair (RF06-CA5). | Gravação periódica garantida a cada 500 ms mesmo com viradas contínuas (*throttle*): mais escritas no disco para ganhar, no pior caso, as viradas do último meio segundo antes de uma queda do app. |
 
 > **Limitações conhecidas (aceitas com a QA-01):**
 > * Uma segunda biblioteca com séries e arquivos de mesmo nome herda o progresso já registrado para esses nomes.
 > * Renomear uma pasta de série ou um arquivo `.cbr`/`.cbz` faz o sistema tratá-lo como novo, perdendo o progresso associado ao nome anterior.
+
+---
+
+## 7. Matriz de Rastreabilidade
+
+> Em construção no FIX-01 (Bloco 4, tarefa T11): liga cada critério `RFxx-CAn` / `RNFxx-CAn` à sua verificação (teste automatizado ou roteiro manual).
