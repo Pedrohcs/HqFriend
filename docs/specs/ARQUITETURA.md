@@ -1,4 +1,6 @@
-# PLANO_ARQUITETURA.md — Arquitetura de Software (HqFriend)
+# ARQUITETURA.md — Arquitetura de Software (HqFriend)
+
+> **Spec vigente.** Descreve a arquitetura **atual** da branch `main`. Mudanças entram por um pacote em `docs/changes/` e são aplicadas aqui na etapa de **Sincronização** (ver `docs/README.md`).
 
 ## 1. Visão Arquitetural e Diretrizes de Design
 O **HqFriend** segue uma arquitetura **Monolítica Modular em Camadas (Layered Architecture)** orientada a eventos para Desktop (Windows 11), desenvolvida em **Python** com interface gráfica nativa baseada em **Qt (PySide6)**.
@@ -23,8 +25,8 @@ graph TB
         HomeView["HomeView (Grid de Séries + Context Menu + F5)"]
         SeriesView["SeriesView (Lista de HQs + Context Menu)"]
         CoverPickerModal["CoverPickerDialog (Seletor HQ -> Galeria de Páginas)"]
-        ReaderView["ReaderWindow / Canvas (QGraphicsView + Atalhos)"]
-        Workers["Workers QThread (LibraryScanWorker, CoverWorker, ThumbnailWorker)"]
+        ReaderView["ReaderView / Canvas (QGraphicsView + Atalhos)"]
+        Workers["Workers QThread (LibraryScanWorker, CoverWorker, ThumbnailWorker, ExportWorker)"]
     end
 
     subgraph Application ["2. Domain & Application Layer (Services & Models)"]
@@ -81,6 +83,7 @@ Responsável exclusivamente pela renderização visual, captura de eventos de mo
     * `LibraryScanWorker`: executa a varredura do disco (`FileSystemScanner`) fora da thread principal e entrega o resultado bruto para o `LibraryService` mesclar na thread principal.
     * `CoverWorker`: gera progressivamente as capas padrão ausentes via `CoverService` e emite `cover_ready(series_name)` para atualizar cada card.
     * `ThumbnailWorker`: extrai e redimensiona as páginas da HQ escolhida no `CoverPickerDialog`, emitindo `page_thumbnail_ready(page_index, QImage)`; verifica `isInterruptionRequested()` entre páginas.
+    * `ExportWorker`: grava o PNG do `Ctrl + P` fora da thread principal (a gravação de uma página dupla em resolução original leva alguns segundos).
 
 ### 2.2. Camada de Domínio e Aplicação (`Domain & Application Layer`)
 Contém toda a inteligência e regras de negócio do **HqFriend**, sem qualquer dependência de interface gráfica (não importa PySide6).
@@ -172,6 +175,20 @@ A modelagem utiliza o **nome da pasta** como chave da Série e o **nome do arqui
 > * `total_pages` é preenchido/atualizado sempre que a HQ é aberta (a varredura não abre os arquivos compactados).
 
 > **Nota Arquitetural sobre o Status da Série:** Embora o campo `"status"` (`UNREAD`, `IN_PROGRESS`, `READ`) seja persistido no JSON, ele é **sempre revalidado em tempo de execução** pelo `LibraryService` ao escanear a pasta física. Se `Batman` tinha 2 arquivos lidos (`2/2` = `READ`) e o `FileSystemScanner` detectar um 3º arquivo (`Batman_03.cbz`), o `LibraryService` recalcula imediatamente o contador para `2 / 3 obras` e atualiza o status para `IN_PROGRESS` (atendendo integralmente ao **RF09**).
+
+### 3.3. Versionamento e Migração do `state.json`
+O campo `version` identifica a versão do **schema** do arquivo de estado (atual: `"1.0"`). Ele é independente da versão do aplicativo e só muda quando o contrato da seção 3.2 muda.
+
+**Regras para qualquer FEAT ou FIX que altere o schema:**
+1. **Classificar a mudança:**
+    * *Compatível* (novo campo opcional com valor padrão): sobe a versão menor (`1.0` → `1.1`). Arquivos antigos continuam válidos pelo Pydantic, mas a versão é regravada na próxima escrita.
+    * *Incompatível* (renomear, remover ou mudar o tipo ou o significado de um campo): sobe a versão maior (`1.x` → `2.0`) e **exige uma função de migração**.
+2. **Migrar antes de validar:** as migrações são funções puras `dict → dict`, encadeadas por versão (`1.0 → 1.1 → 2.0`) e aplicadas pelo `JsonStateRepository.load()` antes de `AppState.model_validate`. Toda migração tem teste partindo de um JSON real da versão anterior.
+3. **Preservar o original:** antes de gravar o estado migrado pela primeira vez, o repositório guarda uma cópia `state.v<versão-antiga>.json` ao lado do `state.json`.
+4. **Versão futura:** um `state.json` de versão **maior** que a suportada não é sobrescrito nem tratado como corrompido; o sistema avisa o usuário e encerra (evita que uma versão antiga do app destrua dados de uma versão nova).
+5. **Documentar:** o pacote da mudança registra a nova versão no `plan.md`, e esta seção 3.2 é atualizada na Sincronização.
+
+> Na v1.0 só existe a versão `"1.0"`; o mecanismo de migração (regras 2 a 4) é implementado pela **primeira** mudança de schema.
 
 ---
 
@@ -307,15 +324,17 @@ sequenceDiagram
 
 ---
 
-## 5. Decisões Arquiteturais e Tratamento de Casos de Borda (ADRs)
+## 5. Decisões Arquiteturais (ADRs)
 
-| ID | Decisão Arquitetural | Justificativa e Tratamento de Exceções |
-| :--- | :--- | :--- |
-| **ADR-01** | **Ordenação Natural (*Natural Sorting*)** | Muitos arquivos `.cbr`/`.cbz` nomeiam imagens como `1.jpg`, `2.jpg` ... `10.jpg`. A ordenação ASCII padrão colocaria `10.jpg` logo após `1.jpg`. A mesma função de ordenação natural (`re.split(r'(\d+)', filename)`, sem distinção de maiúsculas) é aplicada às páginas dentro dos arquivos compactados, à lista de séries e à lista de HQs de cada série (RF18). |
-| **ADR-02** | **Página Ímpar Final no Modo Página Dupla (`Ctrl+S`)** | Como o pareamento começa na primeira página (`[1,2]`, `[3,4]`), caso uma HQ possua número ímpar de páginas (ex: 25 páginas), ao chegar na página 25 no modo duplo, o `ReaderService` entregará apenas o buffer da página 25, exibindo-a centralizada, e ainda assim disparará o gatilho de conclusão da HQ (**RF07**). |
-| **ADR-03** | **Resiliência a Arquivos Removidos, Renomeados e Corrompidos** | **Removidos:** entradas do `state.json` cujos arquivos não existem mais no disco são mantidas (para preservar o progresso caso o arquivo volte, ex: unidade desconectada), mas ignoradas no contador `X / Y`, evitando contadores inconsistentes (como `12 / 11 obras`). **Renomeados:** são tratados como arquivo novo (limitação conhecida). **Corrompidos/sem imagens:** `InvalidComicError` impede a abertura e qualquer alteração de status (RF20). |
-| **ADR-04** | **Prefetching de Próxima Página em Memória** | Para cumprir o **RNF05** (transição abaixo de 200ms), enquanto o usuário lê a página `N`, uma thread secundária já decodifica em background a página `N+1` (ou o par `N+1, N+2`) em um cache LRU em memória RAM limitado às últimas/próximas 4 páginas. O cache é protegido por `threading.Lock`; cada thread usa seu próprio *handle* de `zipfile` (CBR já está integralmente em RAM, compartilhado em modo somente leitura). |
-| **ADR-05** | **Caminhos de Sistema via Pastas Conhecidas do Windows** | Em vez de caminhos fixos (`C:\Users\Computador\...`), o sistema resolve `%DOCUMENTOS%` e `%IMAGENS%` com a API `SHGetKnownFolderPath`, respeitando redirecionamentos para o OneDrive e funcionando com qualquer nome de usuário. |
-| **ADR-06** | **Extração RAR em Passada Única** | Invocar `UnRAR.exe` por página custa um processo por virada e, em arquivos RAR *solid*, obriga a descompactar todas as páginas anteriores a cada extração. Na abertura, a `RarArchiveStrategy` executa uma única extração para `stdout` e fatia o fluxo pelos tamanhos das entradas, mantendo todas as páginas em RAM durante a sessão de leitura. |
-| **ADR-07** | **Logs e Exceções Não Tratadas** | Como o executável roda sem console (`console=False`), exceções sem tratamento seriam perdidas. Toda exceção é registrada em log rotativo e, quando ocorre na UI, exibida ao usuário em mensagem amigável (RNF06). |
-| **ADR-08** | **Instância Única via `QLockFile`** | Duas instâncias gravando o mesmo `state.json` causariam perda de atualizações. A `MainWindow` adquire `hqfriend.lock` na inicialização; se a trava estiver ativa, avisa o usuário e encerra a nova instância (RNF07). |
+Cada decisão fica em um arquivo próprio em [`docs/adr/`](../adr/), com status, data, contexto e consequências. Uma decisão revista **não é editada para dizer outra coisa**: cria-se uma nova ADR e a anterior passa a `Substituída por ADR-NN`. Modelo: [`adr/_TEMPLATE.md`](../adr/_TEMPLATE.md).
+
+| ID | Decisão | Status |
+| :--- | :--- | :---: |
+| [ADR-01](../adr/ADR-01-ordenacao-natural.md) | Ordenação natural de páginas, séries e HQs | `Aceita` |
+| [ADR-02](../adr/ADR-02-pagina-impar-modo-duplo.md) | Página ímpar final isolada no modo página dupla | `Aceita` |
+| [ADR-03](../adr/ADR-03-arquivos-removidos-renomeados-corrompidos.md) | Resiliência a arquivos removidos, renomeados e corrompidos | `Aceita` |
+| [ADR-04](../adr/ADR-04-prefetch-cache-paginas.md) | Prefetch de páginas em cache LRU de 6 páginas | `Aceita` |
+| [ADR-05](../adr/ADR-05-pastas-conhecidas-windows.md) | Caminhos de sistema via pastas conhecidas do Windows | `Aceita` |
+| [ADR-06](../adr/ADR-06-extracao-rar-passada-unica.md) | Extração RAR em passada única | `Aceita` |
+| [ADR-07](../adr/ADR-07-logs-excecoes.md) | Logs e exceções não tratadas | `Aceita` |
+| [ADR-08](../adr/ADR-08-instancia-unica.md) | Instância única via `QLockFile` | `Aceita` |

@@ -1,4 +1,6 @@
-# PLANO_TECNICO.md — Especificação Técnica de Implementação (HqFriend)
+# TECNICO.md — Especificação Técnica de Implementação (HqFriend)
+
+> **Spec vigente.** Descreve as regras técnicas e algoritmos **atuais** da branch `main`. Este documento define o *comportamento* e as *restrições*; o código é a referência de implementação. Por isso, **não copie código-fonte para cá** — aponte para o arquivo. Trechos curtos só são aceitos quando o próprio algoritmo é a regra (ex: ordenação natural, união de páginas).
 
 ## 1. Stack Tecnológica e Dependências
 
@@ -75,6 +77,7 @@ hqfriend/
 │   └── ui/                              # [Camada 1 - Apresentação] PySide6 Views & Widgets
 │       ├── __init__.py
 │       ├── main_window.py               # QMainWindow com QStackedWidget (Home -> Series -> Reader)
+│       ├── error_dialog.py              # Exibição de exceções não tratadas de qualquer thread (RNF06)
 │       ├── views/
 │       │   ├── home_view.py             # Grid de cards de Séries + Menu de Contexto + F5/Atualizar
 │       │   ├── series_view.py           # Lista de HQs da Série + Duplo Clique + Menu de Contexto
@@ -84,13 +87,15 @@ hqfriend/
 │       └── workers/
 │           ├── library_scan_worker.py   # QThread: varredura do disco fora da thread principal
 │           ├── cover_worker.py          # QThread: geração progressiva de capas padrão
-│           └── thumbnail_worker.py      # QThread: extração assíncrona de páginas para o CoverPicker
+│           ├── thumbnail_worker.py      # QThread: extração assíncrona de páginas para o CoverPicker
+│           └── export_worker.py         # QThread: gravação do PNG do Ctrl + P
 │
-├── tests/                               # Testes pytest espelhando src/ (domain, infrastructure, services)
-│   ├── fixtures/                        # .cbz/.cbr de exemplo (inclui RAR solid, ZIP renomeado, arquivo vazio)
+├── tests/                               # Testes pytest espelhando src/
+│   ├── fixtures/                        # .cbz/.cbr de exemplo, gerados por build_fixtures.py
 │   ├── domain/
 │   ├── infrastructure/
-│   └── services/
+│   ├── services/
+│   └── ui/                              # Testes de UI em modo offscreen (conftest.py)
 │
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -104,52 +109,22 @@ hqfriend/
 ### 3.1. Resolução de Caminhos e Ambiente Executável (`src/config.py`)
 Para que o sistema funcione tanto rodando via Python quanto compilado pelo PyInstaller, todas as referências a recursos internos (`bin/UnRAR.exe` e `assets/`) devem usar o resolvedor `_MEIPASS`. As pastas do usuário são resolvidas pela API de *Known Folders* do Windows, respeitando redirecionamentos para o OneDrive (ADR-05):
 
-```python
-import ctypes
-import sys
-import uuid
-from ctypes import wintypes
-from pathlib import Path
+* **`get_resource_path(relative_path)`:** resolve a partir de `sys._MEIPASS` quando executado pelo PyInstaller e da raiz do projeto em desenvolvimento.
+* **Pastas conhecidas:** `%DOCUMENTOS%` (`FOLDERID_Documents`) e `%IMAGENS%` (`FOLDERID_Pictures`) via `SHGetKnownFolderPath` (`ctypes`), liberando o ponteiro com `CoTaskMemFree`; falha da API lança `OSError`.
+* **Constantes expostas** (todas derivadas das pastas acima; nenhum caminho com nome de usuário fixo):
 
-def get_resource_path(relative_path: str) -> Path:
-    """Resolve caminho de recursos internos tanto em dev quanto no .exe (PyInstaller)."""
-    base_path = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent))
-    return base_path / relative_path
+| Constante | Caminho |
+| :--- | :--- |
+| `APP_DATA_DIR` | `%DOCUMENTOS%\HqFriend` |
+| `COVERS_CACHE_DIR` | `%DOCUMENTOS%\HqFriend\covers` |
+| `LOGS_DIR` | `%DOCUMENTOS%\HqFriend\logs` |
+| `STATE_JSON_PATH` / `STATE_BACKUP_PATH` | `%DOCUMENTOS%\HqFriend\state.json` / `state.json.bak` |
+| `LOCK_FILE_PATH` | `%DOCUMENTOS%\HqFriend\hqfriend.lock` |
+| `EXPORT_PICTURES_DIR` | `%IMAGENS%\HQs` |
+| `SYSTEM_DIRECTORIES` | as 4 pastas criadas na inicialização (RNF03) |
+| `UNRAR_BINARY_PATH` | `get_resource_path("bin/UnRAR.exe")` |
 
-class _GUID(ctypes.Structure):
-    _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
-                ("Data3", wintypes.WORD), ("Data4", ctypes.c_ubyte * 8)]
-
-_FOLDERID_DOCUMENTS = "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}"
-_FOLDERID_PICTURES = "{33E28130-4E1E-4676-835A-98395C3BC3BB}"
-
-def _known_folder(folder_id: str) -> Path:
-    """Resolve uma pasta conhecida do Windows (ex: Documentos redirecionado ao OneDrive)."""
-    guid = _GUID.from_buffer_copy(uuid.UUID(folder_id).bytes_le)
-    path_ptr = ctypes.c_wchar_p()
-    hresult = ctypes.windll.shell32.SHGetKnownFolderPath(
-        ctypes.byref(guid), 0, None, ctypes.byref(path_ptr))
-    try:
-        if hresult != 0:
-            raise OSError(f"SHGetKnownFolderPath falhou (HRESULT {hresult & 0xFFFFFFFF:#010x})")
-        return Path(path_ptr.value)
-    finally:
-        ctypes.windll.ole32.CoTaskMemFree(path_ptr)
-
-# Diretórios exigidos pelos requisitos (RNF02, RNF03, RNF06, RF17)
-DOCUMENTS_DIR = _known_folder(_FOLDERID_DOCUMENTS)
-PICTURES_DIR = _known_folder(_FOLDERID_PICTURES)
-
-APP_DATA_DIR = DOCUMENTS_DIR / "HqFriend"
-COVERS_CACHE_DIR = APP_DATA_DIR / "covers"
-LOGS_DIR = APP_DATA_DIR / "logs"
-STATE_JSON_PATH = APP_DATA_DIR / "state.json"
-STATE_BACKUP_PATH = APP_DATA_DIR / "state.json.bak"
-LOCK_FILE_PATH = APP_DATA_DIR / "hqfriend.lock"
-EXPORT_PICTURES_DIR = PICTURES_DIR / "HQs"
-
-UNRAR_BINARY_PATH = get_resource_path("bin/UnRAR.exe")
-```
+Implementação: `src/config.py`.
 
 ---
 
@@ -158,42 +133,10 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
 
 > **Decisão QA-01 (`REQUISITOS.md`, opção C):** o modelo mantém o estado único chaveado por nome de série/arquivo. Trocar `root_directory` apenas atualiza esse campo; `series` não é limpo nem reorganizado.
 
-```python
-from datetime import datetime
-from enum import Enum
-from typing import Dict, Optional
-from pydantic import BaseModel, Field
-
-class SeriesStatus(str, Enum):
-    UNREAD = "UNREAD"
-    IN_PROGRESS = "IN_PROGRESS"
-    READ = "READ"
-
-class CoverSource(BaseModel):
-    comic_filename: str
-    page_index: int = 0
-
-class ComicState(BaseModel):
-    is_read: bool = False
-    current_page: int = 0            # Índice base-0 da página (ou da 1ª página do par) visível
-    total_pages: int = 0             # Atualizado a cada abertura da HQ
-    last_read_at: Optional[datetime] = None
-
-class SeriesState(BaseModel):
-    status: SeriesStatus = SeriesStatus.UNREAD
-    custom_cover_image: Optional[str] = None   # Relativo a APP_DATA_DIR (ex: "covers\\Batman.png")
-    cover_source: Optional[CoverSource] = None
-    comics: Dict[str, ComicState] = Field(default_factory=dict)
-
-class ReaderPreferences(BaseModel):
-    double_page_mode: bool = False
-
-class AppState(BaseModel):
-    version: str = "1.0"
-    root_directory: Optional[str] = None
-    reader_preferences: ReaderPreferences = Field(default_factory=ReaderPreferences)
-    series: Dict[str, SeriesState] = Field(default_factory=dict)
-```
+* **Schemas** (`src/domain/models.py`): `AppState` → `ReaderPreferences`, `series: Dict[str, SeriesState]` → `comics: Dict[str, ComicState]` e `CoverSource`. O contrato de campos, tipos e exemplo está em `ARQUITETURA.md` §3.2; a política de versão e migração, em §3.3.
+* **Enum** `SeriesStatus` (`src/domain/enums.py`): `UNREAD`, `IN_PROGRESS`, `READ`.
+* **DTOs para a UI** (`dataclass(frozen=True)`): `SeriesDTO` (inclui `counter_label` no formato `X / Y obras` e `has_custom_cover`) e `ComicDTO` (inclui `is_in_progress`).
+* Toda mudança nesses schemas é uma mudança de contrato e segue `ARQUITETURA.md` §3.3.
 
 **Escrita Atômica (`JsonStateRepository.save`):**
 1. Serializa `AppState` usando `state.model_dump_json(indent=2)`.
@@ -351,10 +294,11 @@ A `MainWindow` inicia maximizada em **Dark Mode** (`#121212`) e contém um `QSta
 ### 4.2. Canvas de Leitura, Zoom, Pan e Reset (`ReaderView`)
 Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fundo preto (`#000000`):
 * **Renderização:** Converte os bytes da página em `QImage` $\rightarrow$ `QPixmap` com `Qt.SmoothTransformation`.
-* **Captura de Teclado:** `QGraphicsView` (via `QAbstractScrollArea`) consome as setas e a barra de espaço para rolagem. A `ReaderView` deve sobrescrever `keyPressEvent` para tratar `Left`, `Right`, `Space` e `Esc` antes da implementação padrão. `Ctrl + S` e `Ctrl + P` são registrados como `QShortcut` com contexto `Qt.WidgetWithChildrenShortcut`, ativos apenas no leitor.
+* **Captura de Teclado:** `QGraphicsView` (via `QAbstractScrollArea`) consome as setas e a barra de espaço para rolagem. A `ReaderView` sobrescreve `keyPressEvent` para tratar `Left`, `Right`, `Space`, `Esc`, `Ctrl + S` e `Ctrl + P` antes da implementação padrão. Os atalhos com `Ctrl` também ficam no `keyPressEvent` (e não em `QShortcut`): o efeito é o mesmo — ativos apenas com o leitor em foco — e o tratamento é testável enviando eventos de teclado ao widget.
+* **Indicador de Página:** um rótulo sobreposto exibe `Pág. N / Total` (ou `Págs. N–M / Total` no modo duplo).
 * **Ajuste Inicial e Reset na Virada de Página:**
     * A função `reset_zoom_fit_to_view()` chama `self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)` e define `self._zoom_level = 0`.
-    * **Regra validada:** Sempre que o usuário avançar ou voltar de página (`Seta Direita`, `Seta Esquerda`, `Espaço`) ou alternar o modo único/duplo (`Ctrl + S`), `reset_zoom_fit_to_view()` é executado automaticamente.
+    * **Regra validada:** Sempre que o usuário avançar ou voltar de página (`Seta Direita`, `Seta Esquerda`, `Espaço`) ou alternar o modo único/duplo (`Ctrl + S`), `reset_zoom_fit_to_view()` é executado automaticamente. O mesmo ocorre ao redimensionar a janela.
 * **Zoom (`Ctrl + Scroll` — RF15) e Arraste com Mouse (*Pan*):**
     * `setDragMode(QGraphicsView.ScrollHandDrag)`: Permite clicar e arrastar a página com o botão esquerdo do mouse sempre que o zoom ultrapassar o tamanho da área visível.
     * `setTransformationAnchor(QGraphicsView.AnchorUnderMouse)`: O zoom amplia exatamente na região onde o cursor do mouse está apontando.
@@ -392,51 +336,11 @@ Para gerar o executável nativo para Windows sem janela de terminal no fundo e j
 pyinstaller --noconfirm --clean HqFriend.spec
 ```
 
-### Especificação do `HqFriend.spec`:
-```python
-# -*- mode: python ; coding: utf-8 -*-
+### Configuração do `HqFriend.spec` (arquivo na raiz do projeto):
+* Entrada `src/main.py`; modo **onedir** (`exclude_binaries=True` + `COLLECT`), nome `HqFriend`.
+* `binaries`: `('bin/UnRAR.exe', 'bin')`. `datas`: `assets/styles/dark_theme.qss` e `assets/icon.ico`.
+* `console=False` (GUI pura), `icon='assets/icon.ico'`, `upx=False` (UPX corrompe DLLs do Qt com frequência e aumenta falsos positivos de antivírus), `excludes=['tkinter']`.
 
-a = Analysis(
-    ['src/main.py'],
-    pathex=['.'],
-    binaries=[
-        ('bin/UnRAR.exe', 'bin'),  # Embarca o UnRAR.exe junto ao executável
-    ],
-    datas=[
-        ('assets/styles/dark_theme.qss', 'assets/styles'),
-        ('assets/icon.ico', 'assets'),
-    ],
-    hiddenimports=[],
-    hookspath=[],
-    runtime_hooks=[],
-    excludes=['tkinter'],
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='HqFriend',
-    icon='assets/icon.ico',
-    debug=False,
-    strip=False,
-    upx=False,      # UPX corrompe DLLs do Qt com frequência e aumenta falsos positivos de antivírus
-    console=False,  # Oculta a janela de terminal (GUI pura)
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    name='HqFriend',
-)
-```
 > **Notas:** os parâmetros `block_cipher`/`cipher`, `win_no_prefer_redirects` e `win_private_assemblies` foram removidos no PyInstaller 6 e não devem ser usados. Evitar excluir módulos da biblioteca padrão como `email`, `http` e `xml`: `importlib.metadata` (usado pelo pydantic) depende de `email`. O resultado é a pasta `dist/HqFriend/`, distribuída inteira (ex: compactada em `.zip`).
 
 ---
@@ -446,7 +350,7 @@ coll = COLLECT(
 1. **Supressão de Janela de Console no `UnRAR.exe` (Windows GUI Mode):**
    Quando uma aplicação PySide6 roda com `console=False` no PyInstaller, chamadas de `subprocess` sem a flag adequada fazem o Windows abrir e fechar rapidamente uma janela preta do `cmd.exe`.
     * *Extração (passada única):* a chamada própria a `subprocess.run` usa `creationflags=subprocess.CREATE_NO_WINDOW` (`0x08000000`).
-    * *Listagem via `rarfile`:* o `rarfile==4.2` já injeta `CREATE_NO_WINDOW` em `rarfile.custom_popen` no Windows (verificado em 2026-10-24). Ao atualizar a versão do `rarfile`, reconfirmar. Critério de aceite da FEAT-05 cobre o teste no executável.
+    * *Listagem via `rarfile`:* o `rarfile==4.2` já injeta `CREATE_NO_WINDOW` em `rarfile.custom_popen` no Windows (verificado em 2026-10-24). Ao atualizar a versão do `rarfile`, reconfirmar. Coberto pelo critério RNF04-CA5 (`REQUISITOS.md`).
 2. **Interrupção do `ThumbnailWorker` na Galeria de Capas (`CoverPickerDialog`):**
    Se o usuário abrir uma HQ com 150 páginas no seletor de capas e fechar o modal (ou trocar de HQ) antes do `ThumbnailWorker` terminar, o diálogo chama `worker.requestInterruption()` e `worker.wait()` no `closeEvent`. O worker (subclasse de `QThread`) verifica `isInterruptionRequested()` entre cada página, encerra o laço e libera o arquivo `.cbr`/`.cbz`.
 3. **Arquivos `.cbr`/`.cbz` com Imagens WebP ou Corrompidas:**

@@ -79,11 +79,12 @@ Para os detalhes, veja a pasta [`docs/`](docs/):
 
 | Documento | Conteúdo |
 | :--- | :--- |
-| [`REQUISITOS.md`](docs/REQUISITOS.md) | Requisitos funcionais e não funcionais, histórias de usuário e fluxo do sistema |
-| [`PLANO_ARQUITETURA.md`](docs/PLANO_ARQUITETURA.md) | Camadas, contrato do `state.json`, diagramas de sequência e ADRs |
-| [`PLANO_TECNICO.md`](docs/PLANO_TECNICO.md) | Stack, algoritmos, interface e empacotamento |
-| [`PLANO_DESENVOLVIMENTO.md`](docs/PLANO_DESENVOLVIMENTO.md) | Backlog das 13 features e critérios de aceite |
-| [`STATUS_PROJETO.md`](docs/STATUS_PROJETO.md) | Quadro de features e histórico de atualizações |
+| [`docs/README.md`](docs/README.md) | Processo SDD: como especificar e entregar novas features e correções |
+| [`specs/REQUISITOS.md`](docs/specs/REQUISITOS.md) | Requisitos funcionais e não funcionais com critérios de aceite, histórias de usuário e fluxo do sistema |
+| [`specs/ARQUITETURA.md`](docs/specs/ARQUITETURA.md) | Camadas, contrato e migração do `state.json`, diagramas de sequência e índice de ADRs |
+| [`specs/TECNICO.md`](docs/specs/TECNICO.md) | Stack, algoritmos, interface e empacotamento |
+| [`adr/`](docs/adr/) | Decisões arquiteturais (uma por arquivo) |
+| [`STATUS_PROJETO.md`](docs/STATUS_PROJETO.md) | Quadro de features e correções, e histórico de atualizações |
 
 ---
 
@@ -246,7 +247,7 @@ O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR
 HqFriend/
 ├── assets/                  # Ícone e tema Dark Mode (dark_theme.qss)
 ├── bin/UnRAR.exe            # Binário embutido para leitura de .cbr
-├── docs/                    # Especificação e status do projeto
+├── docs/                    # Specs vigentes (SDD), ADRs, pacotes de mudança e status
 ├── src/
 │   ├── main.py              # Ponto de entrada
 │   ├── config.py            # Caminhos do sistema (Documentos/Imagens) e recursos

@@ -1,5 +1,7 @@
 # PLANO_DESENVOLVIMENTO.md — Backlog e Roteiro de Desenvolvimento (HqFriend)
 
+> **ARQUIVADO — somente leitura.** Backlog original da v1.0 (FEAT-01 a FEAT-13), todas concluídas em 2026-10-24. Mantido como registro histórico: **não edite**. Os critérios de aceite foram migrados para os próprios requisitos (`RFxx-CAn` / `RNFxx-CAn`) em [`specs/REQUISITOS.md`](../../specs/REQUISITOS.md), e as referências a `PLANO_ARQUITETURA.md` / `PLANO_TECNICO.md` correspondem hoje a `specs/ARQUITETURA.md` / `specs/TECNICO.md`. Novas features e correções seguem o processo de [`docs/README.md`](../../README.md).
+
 ## 1. Visão Geral e Estratégia de Execução
 O desenvolvimento do **HqFriend** está organizado em **5 Fases (Épicos)** e **13 Features (`FEAT-01` a `FEAT-13`)**. A sequência respeita a dependência entre as 3 camadas definidas no `PLANO_ARQUITETURA.md`, garantindo que nenhuma tela seja construída antes que seus serviços e adaptadores de infraestrutura estejam testados e operacionais.
 
