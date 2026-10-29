@@ -1,6 +1,6 @@
 # FIX-01 — Sincronização da Spec com o Código da v1.0 e Botão de Fechar do Leitor
 
-* **Status:** `pendente`
+* **Status:** `em andamento`
 * **Branch:** `fix/FIX-01-sincronizacao-spec-v1.0`
 * **Severidade:** `média` — nenhum defeito de dados ou de função principal; a spec vigente não descreve fielmente o sistema entregue, o que invalida o SDD como base para as próximas mudanças.
 * **Versão afetada:** v1.0 · **Corrigido em:** v1.0.1
@@ -190,15 +190,17 @@ Tabela com **todos** os critérios `RFxx-CAn` / `RNFxx-CAn`: `Critério | Verifi
 * **Parte de spec:** a matriz da seção 5.6 é a verificação. Nenhum critério pode ficar sem linha.
 
 ## 7. Tarefas
-Ordem sugerida: primeiro o código (fecha o Tipo A e valida RF21-CA3 antes de sincronizar), depois a documentação.
+Execução em 4 blocos, com revisão do usuário ao fim de cada um: **Bloco 1** (T1–T6), **Bloco 2** (T7, T8, T13), **Bloco 3** (T9, T10, T10b), **Bloco 4** (T11, T12 + Definição de Pronto). Ordem: primeiro o código (fecha o Tipo A e valida RF21-CA3 antes de sincronizar), depois a documentação.
 
 ### Código
-- [ ] **T1** — Teste do botão "Fechar" (falhando) — `RF14-CA3`
-- [ ] **T2** — Botão "Fechar" no `ReaderView` + estilo no `dark_theme.qss` — `RF14-CA3`
-- [ ] **T3** — Corrigir o comentário do *debounce* em `reader_view.py` — `QA-06`
-- [ ] **T4** — Teste da trava obsoleta (ou justificar como manual) — `RNF07-CA1`
-- [ ] **T5** — Testes que faltarem para os critérios novos que descrevem comportamento existente: `RF06-CA4` (já coberto), `RF21-CA1..3`, `RF02-CA3`, `RF19-CA4`, `RF12-CA4`, `RF13-CA2`, `RF14-CA4` — reaproveitar testes existentes quando já cobrirem
-- [ ] **T6** — `pytest` completo passando (registrar o total)
+- [x] **T1** — Teste do botão "Fechar" (falhando) — `RF14-CA3` · `test_botao_fechar_volta_para_a_serie` e `test_botao_fechar_acompanha_o_redimensionamento` falharam com `AttributeError: 'ReaderView' object has no attribute 'close_button'`
+- [x] **T2** — Botão "Fechar" no `ReaderView` + estilo no `dark_theme.qss` — `RF14-CA3` · `close_button` (`QPushButton#readerCloseButton`, 32×32, margem `OVERLAY_MARGIN` = 16 px, âmbar no *hover*), reposicionado no `resizeEvent`
+- [x] **T3** — Corrigir o comentário do *debounce* em `reader_view.py` — `QA-06`
+- [x] **T4** — Teste da trava obsoleta (ou justificar como manual) — `RNF07-CA1` · automatizado: `test_trava_de_processo_encerrado_nao_bloqueia_abertura` (subprocesso adquire a trava e é encerrado com `kill()`, sem liberá-la)
+- [x] **T5** — Testes que faltarem para os critérios novos que descrevem comportamento existente: `RF06-CA4` (já coberto), `RF21-CA1..3`, `RF02-CA3`, `RF19-CA4`, `RF12-CA4`, `RF13-CA2`, `RF14-CA4` — reaproveitar testes existentes quando já cobrirem
+  * Já cobertos por testes existentes: `RF06-CA4` (`test_releitura_nao_desmarca_hq_lida`), `RF02-CA3` (`test_sem_raiz_configurada_convida_a_selecionar_pasta`, `test_raiz_inexistente_convida_a_selecionar_pasta_sem_apagar_estado`, `test_raiz_sem_series_mostra_mensagem`), `RF12-CA4` — pré-seleção e botão (`test_reabrir_seletor_parte_da_hq_da_capa_atual`, `test_botao_de_confirmar_exige_pagina_selecionada`), `RF13-CA2` (`test_duplo_clique_em_hq_valida_abre_o_leitor` + volta do título em `test_botao_fechar_volta_para_a_serie`), `RF14-CA4` (testes do leitor que verificam `page_indicator`)
+  * Novos: `test_viradas_seguidas_adiam_a_gravacao_do_bookmark` (`RF06-CA5`), `test_pagina_ilegivel_mostra_quadro_substituto_e_leitura_continua` (`RF21-CA1..3`, **RF21-CA3 confirmado**), `test_varredura_em_andamento_e_indicada_no_cabecalho` (`RF19-CA4`), `test_cabecalho_exibe_a_raiz_com_caminho_completo_no_tooltip` (`RF02-CA4`, parte do cabeçalho), `test_duplo_clique_na_miniatura_confirma_a_capa` (`RF12-CA4`, duplo clique)
+- [x] **T6** — `pytest` completo passando (registrar o total) · **240 testes** (232 + 8 novos); `tests/ui` repetido 5 vezes sem falhas
 
 ### Documentação
 - [ ] **T7** — Aplicar a seção 5.1 em `specs/REQUISITOS.md` (RF02, RF06, RF12, RF13, RF14, RF19 modificados; RF21 e RNF08 adicionados; convenção de verificação)
@@ -213,7 +215,9 @@ Ordem sugerida: primeiro o código (fecha o Tipo A e valida RF21-CA3 antes de si
 ### Desvios em Relação a Este Plano
 | Planejado | Implementado | Motivo | Doc a atualizar |
 | :--- | :--- | :--- | :--- |
-| | | | |
+| RF14-CA3: "depois do clique o teclado continua controlando o leitor até ele fechar" | O botão não recebe foco (`Qt.NoFocus`): as teclas nunca saem do leitor, inclusive após passar o mouse ou clicar perto do botão | A redação original não era verificável (o clique fecha o leitor) | `specs/REQUISITOS.md` RF14-CA3 (Bloco 2): "o botão não recebe foco do teclado; as teclas de navegação continuam indo para o leitor" |
+| RF02-CA4: verificação automática | Cabeçalho coberto por teste; "abre maximizado" (`main.py`, `showMaximized()`) fica como verificação **manual** | `main()` não é exercitado pelos testes de UI | Matriz de rastreabilidade (Bloco 4) |
+| RF12-CA4: duplo clique via `QTest.mouseDClick` | Teste usa `mouseClick` + `mouseDClick` | No Qt 6, `mouseDClick` sozinho não gera `itemDoubleClicked` (é como o utilitário de teste funciona; o duplo clique real funciona) | `specs/TECNICO.md` §7, armadilhas de teste (Bloco 3) |
 
 ## 8. Definição de Pronto
 - [ ] Teste de regressão do botão adicionado (falha sem a correção) e `pytest` passando por completo
@@ -225,4 +229,4 @@ Ordem sugerida: primeiro o código (fecha o Tipo A e valida RF21-CA3 antes de si
 
 ## 9. Aprovação
 - [x] Decisões QA-05 e QA-06 tomadas pelo usuário (2026-10-29)
-- [ ] Este documento revisado e aprovado para implementação (data: AAAA-MM-DD)
+- [x] Este documento revisado e aprovado para implementação (data: 2026-10-29)

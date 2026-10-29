@@ -6,7 +6,7 @@ from typing import List, Optional
 from PIL import Image
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPixmap
-from PySide6.QtWidgets import QFrame, QGraphicsScene, QGraphicsView, QLabel
+from PySide6.QtWidgets import QFrame, QGraphicsScene, QGraphicsView, QLabel, QPushButton
 
 from src.domain.errors import InvalidComicError
 from src.services.export_service import ExportService
@@ -21,6 +21,7 @@ ZOOM_MIN = 0.5
 ZOOM_MAX = 5.0
 FLUSH_DELAY_MS = 500
 TOAST_DURATION_MS = 2000
+OVERLAY_MARGIN = 16
 
 
 def decode_page(data: bytes) -> QImage:
@@ -72,12 +73,18 @@ class ReaderView(QGraphicsView):
         self.setFocusPolicy(Qt.StrongFocus)
 
         self.page_indicator = QLabel(self, objectName="pageIndicator", alignment=Qt.AlignCenter)
+        # Sem foco: as teclas de navegação continuam indo para o leitor (RF14-CA3)
+        self.close_button = QPushButton("✕", self, objectName="readerCloseButton",
+                                        toolTip="Fechar (Esc)", focusPolicy=Qt.NoFocus,
+                                        cursor=Qt.PointingHandCursor)
+        self.close_button.clicked.connect(lambda: self.close_requested.emit())
         self.toast = QLabel(self, objectName="readerToast", alignment=Qt.AlignCenter)
         self.toast.hide()
         self._toast_timer = QTimer(self, singleShot=True, interval=TOAST_DURATION_MS)
         self._toast_timer.timeout.connect(self.toast.hide)
 
-        # Gravação agrupada do bookmark: no máximo a cada FLUSH_DELAY_MS durante a leitura
+        # Gravação agrupada do bookmark (debounce): grava FLUSH_DELAY_MS após a última mudança
+        # de página; fechar, concluir e sair do app gravam de imediato (QA-06)
         self._flush_timer = QTimer(self, singleShot=True, interval=FLUSH_DELAY_MS)
         self._flush_timer.timeout.connect(self._reader.flush)
 
@@ -133,7 +140,12 @@ class ReaderView(QGraphicsView):
     def _position_page_indicator(self) -> None:
         indicator = self.page_indicator
         indicator.move((self.width() - indicator.width()) // 2,
-                       self.height() - indicator.height() - 16)
+                       self.height() - indicator.height() - OVERLAY_MARGIN)
+
+    def _position_close_button(self) -> None:
+        button = self.close_button
+        button.adjustSize()
+        button.move(self.width() - button.width() - OVERLAY_MARGIN, OVERLAY_MARGIN)
 
     # ---- Zoom e pan (RF15) -------------------------------------------------------------------
 
@@ -248,4 +260,5 @@ class ReaderView(QGraphicsView):
         if self._zoom == 1.0 and not self._scene.sceneRect().isEmpty():
             self.fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
         self._position_page_indicator()
+        self._position_close_button()
         self._position_toast()

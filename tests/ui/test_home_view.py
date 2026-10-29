@@ -1,10 +1,12 @@
 import shutil
+import subprocess
+import sys
 import threading
 
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSizePolicy
 
 from src.domain.enums import SeriesStatus
 from src.main import acquire_instance_lock
@@ -191,6 +193,25 @@ def test_atualizacao_durante_varredura_e_enfileirada_uma_vez(home, library_root)
     assert home.card_names() == ["Batman", "Homem-Aranha", "Quebrada"]
 
 
+def test_varredura_em_andamento_e_indicada_no_cabecalho(home, library_root):
+    # FIX-01 / RF19-CA4
+    loaded = SignalRecorder(home.library_loaded)
+    home.set_root_directory(library_root)
+
+    assert home.scan_status_label.text() == "Atualizando biblioteca…"
+    loaded.wait()
+    assert home.scan_status_label.text() == ""
+
+
+def test_cabecalho_exibe_a_raiz_com_caminho_completo_no_tooltip(home, library_root):
+    # FIX-01 / RF02-CA4
+    _load(home, library_root)
+
+    assert home.root_label.text() == str(library_root)
+    assert home.root_label.toolTip() == str(library_root)
+    assert home.root_label.minimumSizeHint().width() <= 0 or         home.root_label.sizePolicy().horizontalPolicy() == QSizePolicy.Ignored
+
+
 def test_raiz_sem_series_mostra_mensagem(home, tmp_path):
     empty_root = tmp_path / "vazia"
     empty_root.mkdir()
@@ -237,6 +258,38 @@ def test_segunda_instancia_nao_obtem_a_trava(tmp_path):
 
     first.unlock()
     assert acquire_instance_lock(lock_path) is not None
+
+
+_HOLD_LOCK_SCRIPT = """
+import sys, time
+from PySide6.QtCore import QLockFile
+lock = QLockFile(sys.argv[1])
+assert lock.tryLock(100)
+print("locked", flush=True)
+time.sleep(60)
+"""
+
+
+def test_trava_de_processo_encerrado_nao_bloqueia_abertura(tmp_path):
+    # FIX-01 / RNF07-CA1: processo que morreu sem liberar a trava (ex: encerrado à força)
+    lock_path = tmp_path / "hqfriend.lock"
+    holder = subprocess.Popen([sys.executable, "-c", _HOLD_LOCK_SCRIPT, str(lock_path)],
+                              stdout=subprocess.PIPE, text=True)
+    try:
+        assert holder.stdout.readline().strip() == "locked"
+        assert acquire_instance_lock(lock_path) is None  # processo vivo: trava válida
+
+        holder.kill()  # TerminateProcess: o QLockFile do processo não chega a ser liberado
+        holder.wait(timeout=10)
+        assert lock_path.exists()
+
+        lock = acquire_instance_lock(lock_path)
+        assert lock is not None
+        lock.unlock()
+    finally:
+        if holder.poll() is None:
+            holder.kill()
+        holder.stdout.close()
 
 
 def test_status_labels_cobrem_todos_os_status():

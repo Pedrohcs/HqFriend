@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** especificado e aguardando aprovação para implementação (alvo: v1.0.1).
+**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** em andamento — Bloco 1/4 concluído (código), aguardando revisão do usuário para o Bloco 2 (alvo v1.0.1).
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -27,7 +27,7 @@
 | **FEAT-11** | Fase 5 (v1.0) | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
 | **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
-| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `pendente` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Aguardando aprovação do `fix.md` |
+| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `em andamento` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Bloco 1/4 ✅ (T1–T6) — aguardando revisão |
 
 ---
 
@@ -266,3 +266,22 @@
 * **Responsável:** Tech Lead
 * **Etapa Atual:** `FIX-01` especificado em `docs/changes/FIX-01/fix.md`, aguardando aprovação para iniciar a implementação (alvo: v1.0.1).
 * **Resumo das Mudanças:** por decisão do usuário, as pastas de pacote passam a ter apenas tipo + número (`FEAT-NN` / `FIX-NN`), sem título; o título fica só dentro do `spec.md` / `fix.md` e no quadro. A pasta citada no Registro #021 foi renomeada de `docs/changes/FIX-01-sincronizacao-spec-v1.0/` para `docs/changes/FIX-01/`. Regra registrada em `docs/README.md` (Regras da Spec Vigente, item 6), `CLAUDE.md` e no template de PR.
+
+### [Registro #023] — 2026-10-29 — FIX-01 Aprovado e Iniciado (Bloco 1)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 1/4 (código: T1–T6).
+* **Resumo das Mudanças:**
+    * `fix.md` aprovado pelo usuário (seção 9). Execução em 4 blocos com revisão ao fim de cada um: Bloco 1 (T1–T6, código), Bloco 2 (T7, T8, T13, requisitos), Bloco 3 (T9, T10, T10b, arquitetura, ADRs e licença do UnRAR), Bloco 4 (T11, T12 e Definição de Pronto). As tarefas são acompanhadas na seção 7 do `fix.md`; o quadro mostra o bloco atual.
+    * Branch `fix/FIX-01-sincronizacao-spec-v1.0` criada a partir da `feature-hq-cover` (commit `09f8eb0`), que contém as FEAT-07 a FEAT-13 ainda não integradas à `main`.
+    * `FIX-01` $\rightarrow$ `em andamento`.
+
+### [Registro #024] — 2026-10-29 — FIX-01: Bloco 1 Concluído (Código)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 1/4 concluído; aguardando revisão do usuário para iniciar o Bloco 2 (requisitos).
+* **Resumo das Mudanças:**
+    * **T1–T2 (RF14-CA3, QA-05):** botão "Fechar" (`✕`) no leitor — `ReaderView.close_button`, sobreposto no canto superior direito, sem foco de teclado, emite o mesmo `close_requested` do `ESC`; estilo `QPushButton#readerCloseButton` no `dark_theme.qss`. Os testes falharam antes da correção (`AttributeError`) e passam depois.
+    * **T3 (QA-06):** comentário do *debounce* do bookmark corrigido em `reader_view.py` (sem mudança de comportamento).
+    * **T4 (RNF07-CA1):** teste automatizado da trava deixada por processo encerrado à força.
+    * **T5:** novos testes para RF06-CA5, RF21-CA1..3 (RF21-CA3 confirmado: a HQ é concluída mesmo com página ilegível), RF19-CA4, RF02-CA4 e RF12-CA4; demais critérios novos já tinham cobertura.
+    * **T6:** **240 testes passando** (232 + 8 novos); `tests/ui` repetido 5 vezes sem falhas.
+    * **Desvios** registrados no `fix.md` (§7): redação do RF14-CA3, verificação manual de "abre maximizado" (RF02-CA4) e o uso de `mouseClick` + `mouseDClick` nos testes de duplo clique.

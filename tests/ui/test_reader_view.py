@@ -1,8 +1,13 @@
+import io
+import logging
+import zipfile
+
 import pytest
-from PySide6.QtCore import QPoint, QPointF, Qt
+from PIL import Image
+from PySide6.QtCore import QPoint, QPointF, QSize, Qt
 from PySide6.QtGui import QWheelEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QGraphicsView
+from PySide6.QtWidgets import QApplication, QGraphicsView
 
 from src.ui.main_window import MainWindow
 from src.ui.views.reader_view import ZOOM_MAX, ZOOM_MIN, decode_page
@@ -189,6 +194,35 @@ def test_pagina_cabe_na_tela_ao_abrir(window):
             or mapped.width() >= viewport.width() - tolerance)
 
 
+def test_botao_fechar_volta_para_a_serie(window, library):
+    # FIX-01 / RF14-CA3
+    reader = _open(window)
+    _key(reader, Qt.Key_Right)
+    button = reader.close_button
+
+    assert button.isVisible()
+    assert button.toolTip() == "Fechar (Esc)"
+    assert button.focusPolicy() == Qt.NoFocus  # as teclas continuam indo para o leitor
+    assert button.geometry().right() > reader.width() - 40 and button.geometry().top() < 40
+
+    QTest.mouseClick(button, Qt.LeftButton)
+
+    assert window.current_view() is window.series_view
+    assert _series_rows(window)["Batman 1.cbz"] == "Em andamento – Pág. 2/4"
+    saved = library._repository.load().state.series["Batman"].comics["Batman 1.cbz"]
+    assert saved.current_page == 1
+    assert window.windowTitle() == "HqFriend"
+
+
+def test_botao_fechar_acompanha_o_redimensionamento(window):
+    # FIX-01 / RF14-CA3
+    reader = _open(window)
+    window.resize(1000, 700)
+    QTest.qWait(50)
+
+    assert reader.close_button.geometry().right() > reader.width() - 40
+
+
 def test_fechar_o_app_durante_a_leitura_grava_o_bookmark(window, library):
     reader = _open(window)
     _key(reader, Qt.Key_Right)
@@ -208,6 +242,68 @@ def test_bookmark_e_gravado_apos_o_intervalo(window, library):
 
     saved = library._repository.load().state.series["Batman"].comics["Batman 1.cbz"]
     assert saved.current_page == 1
+
+
+def test_viradas_seguidas_adiam_a_gravacao_do_bookmark(window, library):
+    # FIX-01 / RF06-CA5 (QA-06): debounce — grava FLUSH_DELAY_MS após a última virada
+    reader = _open(window)
+    _key(reader, Qt.Key_Right)
+    QTest.qWait(300)
+    _key(reader, Qt.Key_Right)
+
+    assert reader._flush_timer.remainingTime() > 300  # reiniciado pela segunda virada
+    saved = library._repository.load().state.series["Batman"].comics["Batman 1.cbz"]
+    assert saved.current_page != 2
+
+    QTest.qWait(700)
+    saved = library._repository.load().state.series["Batman"].comics["Batman 1.cbz"]
+    assert saved.current_page == 2
+
+
+@pytest.fixture
+def illegible_window(qapp, services, tmp_path):
+    """Biblioteca com uma HQ válida cuja 2ª de 3 páginas não é uma imagem decodificável."""
+    root = tmp_path / "HQ-ilegivel"
+    (root / "Ilegível").mkdir(parents=True)
+    page = io.BytesIO()
+    Image.new("RGB", (400, 600), (20, 120, 20)).save(page, format="JPEG")
+    with zipfile.ZipFile(root / "Ilegível" / "Ilegível 1.cbz", "w") as zf:
+        zf.writestr("1.jpg", page.getvalue())
+        zf.writestr("2.jpg", b"isto nao e uma imagem" * 50)
+        zf.writestr("3.jpg", page.getvalue())
+    library, covers = services
+    main = MainWindow(library, covers)
+    main.resize(1280, 800)
+    main.show()
+    loaded = SignalRecorder(main.home_view.library_loaded)
+    main.home_view.set_root_directory(root)
+    loaded.wait()
+    main.show_series("Ilegível")
+    yield main
+    main.close()
+    main.deleteLater()
+
+
+def test_pagina_ilegivel_mostra_quadro_substituto_e_leitura_continua(illegible_window, library,
+                                                                      caplog):
+    # FIX-01 / RF21-CA1, RF21-CA2, RF21-CA3
+    illegible_window.series_view.comic_open_requested.emit("Ilegível", "Ilegível 1.cbz")
+    reader = illegible_window.reader_view
+    completed = SignalRecorder(reader.comic_completed)
+
+    with caplog.at_level(logging.WARNING, logger="src.ui.views.reader_view"):
+        _key(reader, Qt.Key_Right)
+
+    assert reader.page_indicator.text() == "Pág. 2 / 3"
+    [item] = reader._scene.items()
+    assert item.pixmap().size() == QSize(600, 900)  # quadro "Página ilegível"
+    assert any("Página ilegível" in record.getMessage() for record in caplog.records)
+    assert QApplication.activeModalWidget() is None  # sem mensagem modal
+
+    _key(reader, Qt.Key_Right)
+    assert reader.page_indicator.text() == "Pág. 3 / 3"
+    assert completed.count == 1
+    assert library.comic_state("Ilegível", "Ilegível 1.cbz").is_read
 
 
 def test_decode_page_usa_placeholder_para_bytes_invalidos(qapp):
