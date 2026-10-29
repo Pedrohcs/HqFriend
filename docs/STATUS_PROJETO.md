@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.0 entregue** (FEAT-01 a FEAT-13). **FIX-01** especificado e aguardando aprovação para implementação (alvo: v1.0.1).
+**Etapa Atual:** ✅ **v1.0.1 entregue** — v1.0 (FEAT-01 a FEAT-13) + **FIX-01** concluído. Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-02`.
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -27,7 +27,7 @@
 | **FEAT-11** | Fase 5 (v1.0) | Serviço e Canvas de Leitura (`ReaderView`: Zoom, Pan, `Ctrl+S`, Bookmark) | RF06, RF07, RF13 a RF16, RF20 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | RNF05 medido: virar página ≤ 133 ms com páginas de ~3 MB |
 | **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
-| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF19, RF21, RNF07, RNF08 | `pendente` | [FIX-01](changes/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). Aguardando aprovação do `fix.md` |
+| **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF15, RF19, RF21, RNF06, RNF07, RNF08 | `concluida` | [FIX-01](archive/v1.0.1/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). 4 blocos concluídos; executável validado pelo usuário (roteiro M2) |
 
 ---
 
@@ -266,3 +266,80 @@
 * **Responsável:** Tech Lead
 * **Etapa Atual:** `FIX-01` especificado em `docs/changes/FIX-01/fix.md`, aguardando aprovação para iniciar a implementação (alvo: v1.0.1).
 * **Resumo das Mudanças:** por decisão do usuário, as pastas de pacote passam a ter apenas tipo + número (`FEAT-NN` / `FIX-NN`), sem título; o título fica só dentro do `spec.md` / `fix.md` e no quadro. A pasta citada no Registro #021 foi renomeada de `docs/changes/FIX-01-sincronizacao-spec-v1.0/` para `docs/changes/FIX-01/`. Regra registrada em `docs/README.md` (Regras da Spec Vigente, item 6), `CLAUDE.md` e no template de PR.
+
+### [Registro #023] — 2026-10-29 — FIX-01 Aprovado e Iniciado (Bloco 1)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 1/4 (código: T1–T6).
+* **Resumo das Mudanças:**
+    * `fix.md` aprovado pelo usuário (seção 9). Execução em 4 blocos com revisão ao fim de cada um: Bloco 1 (T1–T6, código), Bloco 2 (T7, T8, T13, requisitos), Bloco 3 (T9, T10, T10b, arquitetura, ADRs e licença do UnRAR), Bloco 4 (T11, T12 e Definição de Pronto). As tarefas são acompanhadas na seção 7 do `fix.md`; o quadro mostra o bloco atual.
+    * Branch `fix/FIX-01-sincronizacao-spec-v1.0` criada a partir da `feature-hq-cover` (commit `09f8eb0`), que contém as FEAT-07 a FEAT-13 ainda não integradas à `main`.
+    * `FIX-01` $\rightarrow$ `em andamento`.
+
+### [Registro #024] — 2026-10-29 — FIX-01: Bloco 1 Concluído (Código)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 1/4 concluído; aguardando revisão do usuário para iniciar o Bloco 2 (requisitos).
+* **Resumo das Mudanças:**
+    * **T1–T2 (RF14-CA3, QA-05):** botão "Fechar" (`✕`) no leitor — `ReaderView.close_button`, sobreposto no canto superior direito, sem foco de teclado, emite o mesmo `close_requested` do `ESC`; estilo `QPushButton#readerCloseButton` no `dark_theme.qss`. Os testes falharam antes da correção (`AttributeError`) e passam depois.
+    * **T3 (QA-06):** comentário do *debounce* do bookmark corrigido em `reader_view.py` (sem mudança de comportamento).
+    * **T4 (RNF07-CA1):** teste automatizado da trava deixada por processo encerrado à força.
+    * **T5:** novos testes para RF06-CA5, RF21-CA1..3 (RF21-CA3 confirmado: a HQ é concluída mesmo com página ilegível), RF19-CA4, RF02-CA4 e RF12-CA4; demais critérios novos já tinham cobertura.
+    * **T6:** **240 testes passando** (232 + 8 novos); `tests/ui` repetido 5 vezes sem falhas.
+    * **Desvios** registrados no `fix.md` (§7): redação do RF14-CA3, verificação manual de "abre maximizado" (RF02-CA4) e o uso de `mouseClick` + `mouseDClick` nos testes de duplo clique.
+
+### [Registro #025] — 2026-10-29 — FIX-01: Bloco 2 Concluído (Requisitos)
+* **Responsável:** Analista de Requisitos Sênior / Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 2/4 concluído; aguardando revisão do usuário para iniciar o Bloco 3 (arquitetura, ADRs e licença do UnRAR).
+* **Resumo das Mudanças:**
+    * **T7 — `specs/REQUISITOS.md`:** RF02 (CA3 estados vazios, CA4 cabeçalho e janela maximizada), RF06 (CA4 releitura, CA5 gravação do bookmark — QA-06), RF12 (CA4 pré-seleção e duplo clique), RF13 (CA2 título da janela), RF14 (botão "Fechar" no texto, CA3 botão, CA4 indicador de página) e RF19 (CA4 status da varredura) atualizados, com a origem `FIX-01`; adicionados **RF21** (página ilegível) e **RNF08** (tema escuro); nova convenção de verificação (automática / manual) no cabeçalho; seção 7 (Matriz de Rastreabilidade) criada, a preencher no Bloco 4.
+    * **T8 — Questões decididas:** QA-02 a QA-04 (retroativas, decisões de 2026-10-24) e QA-05 e QA-06 (decisões de 2026-10-29) registradas na seção 6.
+    * **T13:** versão da spec `1.0.1`; reservas de ID restantes do FIX-01: ADR-09 a ADR-13.
+    * **Desvios** registrados no `fix.md` (§7): redação final do RF14-CA3 (inclui o redimensionamento) e criação antecipada do título da seção 7.
+
+### [Registro #026] — 2026-10-29 — FIX-01: Bloco 3 Concluído, exceto a Licença do UnRAR
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 3/4 concluído exceto a T10b, bloqueada por decisão pendente do usuário; aguardando revisão para o Bloco 4.
+* **Resumo das Mudanças:**
+    * **T9 — `specs/ARQUITETURA.md`:** nomes de componentes alinhados ao código (`archive_reader` / `open_archive` + `IComicArchive`, `fs_scanner`, `logging_setup`, modelos `AppState` / `SeriesState` / `ComicState`); responsabilidades de `main.py` (instância única, tema, aviso de recuperação, `UnhandledErrorReporter`) separadas das da `MainWindow`; assinaturas reais dos sinais (`scan_finished(raiz, ScanResult)`, `cover_ready(series, path)`, `page_thumbnail_ready(generation, page, QImage)`); os três diagramas de sequência reescritos a partir do código.
+    * **T9 — `specs/TECNICO.md`:** *debounce* do bookmark (QA-06), criação do `state.json` na primeira abertura, filtro de arquivos ocultos, ZIP criptografado, parâmetros do log (1 MB × 3), nova §3.7 (capas de 400 px e miniaturas de 250 px), sequência de inicialização completa (estilo `Fusion`, `setStaleLockTime(0)`, segunda configuração do log), fit-to-view e arraste, botão "Fechar" e página ilegível no leitor, mapa de atalhos atualizado, ciclo de vida dos workers e encerramento (§6, item 6) e nova §7 (estratégia de testes e armadilhas do PySide6 / Qt 6). Corrigida também a §6.2: trocar de HQ no seletor não aguarda o worker.
+    * **T10:** criadas **ADR-09** (PySide6), **ADR-10** (JSON + Pydantic, SQLite descartado), **ADR-11** (onedir sem UPX), **ADR-12** (`UnRAR.exe` embarcado, com procedimento de atualização) e **ADR-13** (miniaturas por gerador único) e incluídas no índice da ARQ §5. Todos os IDs reservados pelo FIX-01 estão aplicados.
+    * **T10b — bloqueada:** o `License.txt` da instalação do WinRAR é o contrato do WinRAR (versão de avaliação), não uma licença própria do UnRAR (a cláusula 3a permite distribuir separadamente os componentes do UnRAR). A ADR-12 registra a pendência; a forma de cumprir a licença aguarda decisão do usuário.
+
+### [Registro #027] — 2026-10-29 — FIX-01: Licença do UnRAR e Atualização para 7.23 (T10b)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 3/4 concluído; aguardando revisão do usuário para iniciar o Bloco 4 (rastreabilidade, README, build e validação do executável).
+* **Resumo das Mudanças:**
+    * **Decisão do usuário:** opção 1 — usar o UnRAR oficial da RARLAB, com download autorizado.
+    * O pacote avulso *UnRAR for Windows* (`unrarw64.exe`) trazia o **UNRAR 7.30 beta 2**. Para não distribuir uma beta, o **`UnRAR.exe` 7.23** (estável) foi extraído do instalador oficial `winrar-x64-723.exe`, e o **`license.txt`** (licença freeware do UnRAR), do pacote avulso. Pacotes e binário verificados pela assinatura Authenticode da win.rar GmbH e extraídos com o `UnRAR.exe` existente, sem executar instaladores.
+    * `bin/UnRAR.exe` 6.11 $\rightarrow$ **7.23** (SHA-256 `0d371500…b234235`) e novo `bin/license.txt` (SHA-256 `48c3ebe5…4859d09`); `HqFriend.spec` embarca a licença em `_internal\bin\`.
+    * **Verificação:** 43 testes de `test_archive_reader.py` e suíte completa (**240**) passando com o 7.23; build do executável conferido (`_internal\bin\UnRAR.exe` 7.23 + `license.txt`). Validação manual de `.cbr` no `.exe` fica no Bloco 4.
+    * ADR-12 atualizada (versão, procedência, hashes, histórico e procedimento de atualização); TECNICO §1.4 e §5 e README atualizados. O `License.txt` da instalação do WinRAR **não** é usado (é o contrato do WinRAR).
+
+### [Registro #028] — 2026-10-29 — FIX-01: Bloco 4 — Matriz de Rastreabilidade e README
+* **Responsável:** Analista de Requisitos Sênior / Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 4/4; T11 e T12 concluídas. Faltam a validação manual do executável (roteiros M1–M3) e a decisão do usuário sobre 3 lacunas de teste; depois, o arquivamento do pacote.
+* **Resumo das Mudanças:**
+    * **T11 — `specs/REQUISITOS.md` §7:** matriz com os **84 critérios** de aceite — 71 automáticos, 6 automáticos com complemento manual, 4 manuais e 3 lacunas (RF15-CA2, RF17-CA4, RNF06-CA2) — e roteiros manuais M1 (inicialização), M2 (executável) e M3 (desempenho). Os IDs e os nomes de teste citados foram conferidos automaticamente contra a spec e a coleta do pytest.
+    * **T12 — `README.md`:** botão "Fechar" no leitor (funcionalidades e atalhos) e página ilegível.
+
+### [Registro #029] — 2026-10-29 — FIX-01: Lacunas de Teste Fechadas
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FIX-01` em andamento — Bloco 4/4; falta apenas a validação manual do executável (roteiro M2) para concluir e arquivar o pacote.
+* **Resumo das Mudanças:**
+    * **Decisão do usuário:** criar os testes das 3 lacunas da matriz e corrigir o aviso do pytest.
+    * **Novos testes:** `test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela` (RF15-CA2), `test_ctrl_p_com_falha_ao_gravar_mostra_aviso_de_falha` (RF17-CA4) e `tests/ui/test_error_dialog.py` com 3 testes do `UnhandledErrorReporter` (RNF06-CA2: exibição na thread principal, um erro por vez e integração excepthook → log → mensagem).
+    * **RF15-CA2 corrigido:** ao redimensionar, a página só é reajustada à tela com zoom 1x; com zoom ampliado, o zoom é preservado (comportamento implementado, já descrito no TECNICO §4.2).
+    * Corrigido o `SyntaxWarning: invalid escape sequence '\H'` em `tests/ui/test_reader_view.py`.
+    * **Matriz:** 84 critérios — 74 automáticos, 6 automáticos com complemento manual, 4 manuais e **0 lacunas**.
+    * **245 testes passando**, sem avisos; `tests/ui` repetido 3 vezes sem falhas.
+
+### [Registro #030] — 2026-10-29 — FIX-01 Concluído (v1.0.1)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** ✅ **v1.0.1 entregue.** Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-02`.
+* **Resumo das Mudanças:**
+    * **Validação manual (roteiro M2)** confirmada pelo usuário no executável `dist\HqFriend\HqFriend.exe`: leitura de `.cbr` real com o UnRAR 7.23 e de `.cbz` sem janela de console, botão "Fechar" (`✕`), `Ctrl + P` em `Imagens\HQs`, bloqueio da segunda instância, tema escuro e pastas do sistema. Fecha RNF01-CA1/CA2, RNF04-CA5, RNF07-CA1, RNF08-CA1/CA2 e o RF14-CA3 no executável.
+    * **Definição de Pronto** do `fix.md` cumprida integralmente.
+    * **Entregas do FIX-01:** botão "Fechar" no leitor (QA-05); spec vigente sincronizada com o código da v1.0 (requisitos, arquitetura, técnico, QA-02 a QA-06, RF21, RNF08, ADR-09 a ADR-13); UnRAR 6.11 $\rightarrow$ 7.23 estável com a licença freeware embarcada; matriz de rastreabilidade com 84 critérios e 0 lacunas; **245 testes** passando, sem avisos.
+    * **Pacote arquivado** em `docs/archive/v1.0.1/FIX-01/`.
+    * **A cargo do usuário:** commit de fechamento, tag `v1.0.1` e MR para a `main` (a branch `fix/FIX-01-sincronizacao-spec-v1.0` também leva as FEAT-07 a FEAT-13, ainda não integradas à `main`).
+    * `FIX-01` $\rightarrow$ `concluida`.
+

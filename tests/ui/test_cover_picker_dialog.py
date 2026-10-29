@@ -5,6 +5,8 @@ import zipfile
 
 import pytest
 from PIL import Image
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QDialog
 
 from src.services.cover_service import CoverService
@@ -130,6 +132,25 @@ def test_reabrir_seletor_parte_da_hq_da_capa_atual(qapp, library, covers):
 
     assert dialog.selected_comic() == "Batman 2.cbr"
     dialog.close()
+
+
+def test_duplo_clique_na_miniatura_confirma_a_capa(qapp, library, covers):
+    # FIX-01 / RF12-CA4
+    dialog = _open_dialog(library, covers)
+    try:
+        viewport = dialog.pages_list.viewport()
+        center = dialog.pages_list.visualItemRect(dialog.pages_list.item(2)).center()
+
+        # Sequência de um duplo clique real: no Qt 6, mouseDClick sozinho não gera
+        # itemDoubleClicked
+        QTest.mouseClick(viewport, Qt.LeftButton, Qt.NoModifier, center)
+        QTest.mouseDClick(viewport, Qt.LeftButton, Qt.NoModifier, center)
+
+        assert dialog.result() == QDialog.Accepted
+        source = library.cover_source("Batman")
+        assert (source.comic_filename, source.page_index) == ("Batman 1.cbz", 2)
+    finally:
+        dialog.close()
 
 
 def test_hq_invalida_mostra_mensagem_sem_paginas(qapp, library, covers):

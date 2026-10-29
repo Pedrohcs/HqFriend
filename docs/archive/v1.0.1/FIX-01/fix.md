@@ -1,6 +1,6 @@
 # FIX-01 — Sincronização da Spec com o Código da v1.0 e Botão de Fechar do Leitor
 
-* **Status:** `pendente`
+* **Status:** `concluida` (2026-10-29)
 * **Branch:** `fix/FIX-01-sincronizacao-spec-v1.0`
 * **Severidade:** `média` — nenhum defeito de dados ou de função principal; a spec vigente não descreve fielmente o sistema entregue, o que invalida o SDD como base para as próximas mudanças.
 * **Versão afetada:** v1.0 · **Corrigido em:** v1.0.1
@@ -41,7 +41,7 @@ Pacote **misto**, com uma parte de código e uma de spec:
 ## 4. Correção
 
 ### 4.1. Código (Tipo A + ajustes)
-* **Arquivos alterados:** `src/ui/views/reader_view.py`, `assets/styles/dark_theme.qss`, `tests/ui/test_reader_view.py`, `tests/ui/test_home_view.py` (ou novo `tests/test_main.py`), `HqFriend.spec` e `bin/license.txt` (tarefa T10b).
+* **Arquivos alterados:** `src/ui/views/reader_view.py`, `assets/styles/dark_theme.qss`, `tests/ui/test_reader_view.py`, `tests/ui/test_home_view.py`, `tests/ui/test_cover_picker_dialog.py`, `HqFriend.spec`, `bin/UnRAR.exe` (6.11 → 7.23) e `bin/license.txt` (tarefa T10b).
 * **Abordagem:**
   1. **Botão Fechar no leitor (RF14-CA3):** `QPushButton` filho do `ReaderView`, sobreposto no canto superior direito (mesmo padrão de posicionamento do `page_indicator`, reposicionado no `resizeEvent`), texto `✕`, tooltip `Fechar (Esc)`, `objectName="readerCloseButton"`, `focusPolicy = Qt.NoFocus` (para não roubar o foco do teclado do leitor). O clique emite o mesmo `close_requested` do `ESC`, de modo que a `MainWindow` segue o fluxo existente de `close_reader()` (grava bookmark, libera o arquivo, volta à Tela da Série atualizada). Estilo no `dark_theme.qss`: fundo translúcido, destaque âmbar no *hover*.
   2. **Comentário do bookmark (QA-06):** corrigir o comentário de `reader_view.py:80` para "grava 500 ms após a última mudança de página (*debounce*)". Sem mudança de comportamento.
@@ -185,44 +185,60 @@ Tabela com **todos** os critérios `RFxx-CAn` / `RNFxx-CAn`: `Critério | Verifi
 
 ## 6. Teste de Regressão
 * **Parte de código:** `tests/ui/test_reader_view.py::test_botao_fechar_volta_para_a_serie` — comentário `# FIX-01 / RF14-CA3`. Verifica que o botão existe, está visível com uma HQ aberta, que o clique emite `close_requested` e que, na `MainWindow`, a Tela da Série volta a ser exibida com o bookmark gravado.
-- [ ] O teste **falha** sem a correção (o botão não existe) e **passa** com ela.
+- [x] O teste **falha** sem a correção (o botão não existe) e **passa** com ela. · Confirmado no Bloco 1: `AttributeError: 'ReaderView' object has no attribute 'close_button'` antes da T2.
 * **Trava obsoleta:** `test_trava_de_processo_encerrado_nao_bloqueia_abertura` — `# FIX-01 / RNF07-CA1` (ou registro como manual, ver 4.1-3).
 * **Parte de spec:** a matriz da seção 5.6 é a verificação. Nenhum critério pode ficar sem linha.
 
 ## 7. Tarefas
-Ordem sugerida: primeiro o código (fecha o Tipo A e valida RF21-CA3 antes de sincronizar), depois a documentação.
+Execução em 4 blocos, com revisão do usuário ao fim de cada um: **Bloco 1** (T1–T6), **Bloco 2** (T7, T8, T13), **Bloco 3** (T9, T10, T10b), **Bloco 4** (T11, T12 + Definição de Pronto). Ordem: primeiro o código (fecha o Tipo A e valida RF21-CA3 antes de sincronizar), depois a documentação.
 
 ### Código
-- [ ] **T1** — Teste do botão "Fechar" (falhando) — `RF14-CA3`
-- [ ] **T2** — Botão "Fechar" no `ReaderView` + estilo no `dark_theme.qss` — `RF14-CA3`
-- [ ] **T3** — Corrigir o comentário do *debounce* em `reader_view.py` — `QA-06`
-- [ ] **T4** — Teste da trava obsoleta (ou justificar como manual) — `RNF07-CA1`
-- [ ] **T5** — Testes que faltarem para os critérios novos que descrevem comportamento existente: `RF06-CA4` (já coberto), `RF21-CA1..3`, `RF02-CA3`, `RF19-CA4`, `RF12-CA4`, `RF13-CA2`, `RF14-CA4` — reaproveitar testes existentes quando já cobrirem
-- [ ] **T6** — `pytest` completo passando (registrar o total)
+- [x] **T1** — Teste do botão "Fechar" (falhando) — `RF14-CA3` · `test_botao_fechar_volta_para_a_serie` e `test_botao_fechar_acompanha_o_redimensionamento` falharam com `AttributeError: 'ReaderView' object has no attribute 'close_button'`
+- [x] **T2** — Botão "Fechar" no `ReaderView` + estilo no `dark_theme.qss` — `RF14-CA3` · `close_button` (`QPushButton#readerCloseButton`, 32×32, margem `OVERLAY_MARGIN` = 16 px, âmbar no *hover*), reposicionado no `resizeEvent`
+- [x] **T3** — Corrigir o comentário do *debounce* em `reader_view.py` — `QA-06`
+- [x] **T4** — Teste da trava obsoleta (ou justificar como manual) — `RNF07-CA1` · automatizado: `test_trava_de_processo_encerrado_nao_bloqueia_abertura` (subprocesso adquire a trava e é encerrado com `kill()`, sem liberá-la)
+- [x] **T5** — Testes que faltarem para os critérios novos que descrevem comportamento existente: `RF06-CA4` (já coberto), `RF21-CA1..3`, `RF02-CA3`, `RF19-CA4`, `RF12-CA4`, `RF13-CA2`, `RF14-CA4` — reaproveitar testes existentes quando já cobrirem
+  * Já cobertos por testes existentes: `RF06-CA4` (`test_releitura_nao_desmarca_hq_lida`), `RF02-CA3` (`test_sem_raiz_configurada_convida_a_selecionar_pasta`, `test_raiz_inexistente_convida_a_selecionar_pasta_sem_apagar_estado`, `test_raiz_sem_series_mostra_mensagem`), `RF12-CA4` — pré-seleção e botão (`test_reabrir_seletor_parte_da_hq_da_capa_atual`, `test_botao_de_confirmar_exige_pagina_selecionada`), `RF13-CA2` (`test_duplo_clique_em_hq_valida_abre_o_leitor` + volta do título em `test_botao_fechar_volta_para_a_serie`), `RF14-CA4` (testes do leitor que verificam `page_indicator`)
+  * Novos: `test_viradas_seguidas_adiam_a_gravacao_do_bookmark` (`RF06-CA5`), `test_pagina_ilegivel_mostra_quadro_substituto_e_leitura_continua` (`RF21-CA1..3`, **RF21-CA3 confirmado**), `test_varredura_em_andamento_e_indicada_no_cabecalho` (`RF19-CA4`), `test_cabecalho_exibe_a_raiz_com_caminho_completo_no_tooltip` (`RF02-CA4`, parte do cabeçalho), `test_duplo_clique_na_miniatura_confirma_a_capa` (`RF12-CA4`, duplo clique)
+- [x] **T6** — `pytest` completo passando (registrar o total) · **240 testes** (232 + 8 novos); `tests/ui` repetido 5 vezes sem falhas
 
 ### Documentação
-- [ ] **T7** — Aplicar a seção 5.1 em `specs/REQUISITOS.md` (RF02, RF06, RF12, RF13, RF14, RF19 modificados; RF21 e RNF08 adicionados; convenção de verificação)
-- [ ] **T8** — Aplicar a seção 5.2 (QA-02 a QA-06)
-- [ ] **T9** — Aplicar os itens 1 a 20 da seção 5.3 em `ARQUITETURA.md` e `TECNICO.md`
-- [ ] **T10** — Criar ADR-09 a ADR-13 e atualizar o índice da ARQ §5
-- [ ] **T10b** — Copiar o texto da licença do UnRAR (`license.txt` da instalação local do WinRAR, mesma origem do binário — Registro #009) para `bin/license.txt`, embarcá-lo no `HqFriend.spec` (`datas`) e registrar em TECNICO §1.4 e na ADR-12
-- [ ] **T11** — Montar a matriz de rastreabilidade (seção 5.6) e listar as lacunas encontradas
-- [ ] **T12** — Atualizar o `README.md` da raiz (atalhos: botão "Fechar" do leitor)
-- [ ] **T13** — Atualizar a versão da spec no topo do `REQUISITOS.md` para `1.0.1` e os próximos IDs livres em `docs/README.md` (seção 5.5)
+- [x] **T7** — Aplicar a seção 5.1 em `specs/REQUISITOS.md` (RF02, RF06, RF12, RF13, RF14, RF19 modificados; RF21 e RNF08 adicionados; convenção de verificação)
+- [x] **T8** — Aplicar a seção 5.2 (QA-02 a QA-06)
+- [x] **T9** — Aplicar os itens 1 a 20 da seção 5.3 em `ARQUITETURA.md` e `TECNICO.md`
+- [x] **T10** — Criar ADR-09 a ADR-13 e atualizar o índice da ARQ §5
+- [x] **T10b** — Decisão do usuário (2026-10-29): opção 1, usar o UnRAR oficial da RARLAB. Resultado: `bin/UnRAR.exe` **7.23** estável + `bin/license.txt` (licença freeware), embarcados no `HqFriend.spec`; ADR-12, TECNICO §1.4/§5 e README atualizados; 240 testes passando e build conferido. Plano original: copiar o texto da licença do UnRAR (`license.txt` da instalação local do WinRAR, mesma origem do binário — Registro #009) para `bin/license.txt`, embarcá-lo no `HqFriend.spec` (`datas`) e registrar em TECNICO §1.4 e na ADR-12
+- [x] **T11** — Montar a matriz de rastreabilidade (seção 5.6) e listar as lacunas encontradas · `REQUISITOS.md` §7: **84 critérios** — 71 automáticos, 6 automáticos + manual, 4 manuais e **3 lacunas** (RF15-CA2, RF17-CA4, RNF06-CA2); roteiros manuais M1–M3 em §7.1. Os 84 IDs e todos os testes citados foram conferidos contra a spec e o `pytest --collect-only`
+- [x] **T12** — Atualizar o `README.md` da raiz (atalhos: botão "Fechar" do leitor) · também a página ilegível nas funcionalidades e o `license.txt` do UnRAR (T10b)
+- [x] **T13** — Atualizar a versão da spec no topo do `REQUISITOS.md` para `1.0.1` e os próximos IDs livres em `docs/README.md` (seção 5.5) · próximos IDs já estavam atualizados desde a abertura do pacote; a linha de reservas passou a listar só ADR-09 a ADR-13, ainda pendentes do Bloco 3
 
 ### Desvios em Relação a Este Plano
 | Planejado | Implementado | Motivo | Doc a atualizar |
 | :--- | :--- | :--- | :--- |
-| | | | |
+| RF14-CA3: "depois do clique o teclado continua controlando o leitor até ele fechar" | O botão não recebe foco (`Qt.NoFocus`): as teclas nunca saem do leitor, inclusive após passar o mouse ou clicar perto do botão | A redação original não era verificável (o clique fecha o leitor) | `specs/REQUISITOS.md` RF14-CA3 (Bloco 2): "o botão não recebe foco do teclado; as teclas de navegação continuam indo para o leitor" |
+| RF02-CA4: verificação automática | Cabeçalho coberto por teste; "abre maximizado" (`main.py`, `showMaximized()`) fica como verificação **manual** | `main()` não é exercitado pelos testes de UI | Matriz de rastreabilidade (Bloco 4) |
+| RF14-CA3 (Bloco 2): texto do delta | Aplicado com a redação corrigida do desvio acima e com "acompanha o redimensionamento da janela", já verificado por `test_botao_fechar_acompanha_o_redimensionamento` | Deixar no critério tudo o que o teste verifica | — (já aplicado) |
+| Seção 7 (Matriz) criada no Bloco 4 | Título e aviso "em construção" criados no Bloco 2; conteúdo continua no Bloco 4 (T11) | A convenção de verificação do cabeçalho, aplicada na T7, já aponta para a seção 7 | — (T11) |
+| T9: corrigir pontos específicos dos diagramas da ARQ §4 (itens 5 a 9) | Os três diagramas de sequência foram **reescritos** a partir do código; a §4.3 também mostra o caminho real do bookmark (memória → *debounce* → `flush()`), o `ExportWorker` e o botão "Fechar", e o §2 ganhou o nó `main.py` | Os diagramas tinham mais divergências do que as listadas (ex: `RServ->>Repo` direto, `export_current_view` chamado no `ExportService`) | — (já aplicado) |
+| T9, item 15: capas "em TECNICO §3" | Nova seção **TECNICO §3.7 Capas e Miniaturas** | As regras de capa estavam espalhadas e incompletas | — (já aplicado) |
+| T9: TECNICO §6.2 não estava na lista | Corrigido: trocar de HQ no seletor **não** chama `wait()` (interrompe sem bloquear e descarta as miniaturas pela geração); só fechar ou cancelar o diálogo aguarda os workers | Divergência encontrada ao revisar o código durante a T9 | — (já aplicado) |
+| T10b: copiar `License.txt` da instalação do WinRAR | **Não executado** | O arquivo é o EULA do WinRAR (avaliação, 40 dias), não a licença freeware do UnRAR. A cláusula 3a permite distribuir separadamente os componentes do UnRAR, mas distribuir o EULA do WinRAR como "licença do UnRAR" seria impreciso | Decisão do usuário; depois, ADR-12 (Consequências), TECNICO §1.4 e `HqFriend.spec` |
+| T10b, opção 1: binário e licença do pacote *UnRAR for Windows* | Binário **7.23 estável** extraído do instalador oficial do WinRAR 7.23; `license.txt` do pacote *UnRAR for Windows* | O pacote avulso traz hoje o **7.30 beta 2** e a RARLAB não oferece versões anteriores dele; para não distribuir uma beta numa correção, o binário veio da versão estável. Pacotes verificados pela assinatura da win.rar GmbH e extraídos sem executar | — (ADR-12 atualizada) |
+| T10b: só licença (sem trocar o binário) | Binário atualizado de **6.11 para 7.23** | Consequência da opção 1; risco de regressão coberto pelos testes de RAR e pela validação do executável no Bloco 4 | Bloco 4: validar `.cbr` no `.exe` |
+| T11: lacunas a decidir | Decisão do usuário (2026-10-29): **criar os testes**. `test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela` (RF15-CA2), `test_ctrl_p_com_falha_ao_gravar_mostra_aviso_de_falha` (RF17-CA4) e o novo `tests/ui/test_error_dialog.py` com 3 testes (RNF06-CA2, incluindo a integração excepthook → log → mensagem) | Critérios sem verificação | — (matriz atualizada: 0 lacunas) |
+| RF15-CA2: "redimensionar a janela restaura o ajuste à tela" | Ao redimensionar, a página só é reajustada se estiver ajustada à tela (zoom 1x); com zoom ampliado, o zoom é preservado (como o TECNICO §4.2 já descrevia) | Encontrado ao escrever o teste da lacuna; o comportamento implementado é o desejado (não descarta o zoom do usuário) | `REQUISITOS.md` RF15-CA2 (já aplicado) |
+| — (fora do plano) | Corrigido o aviso `SyntaxWarning: invalid escape sequence '\H'` em `tests/ui/test_reader_view.py` (`"Imagens\\HQs"`) | Pedido do usuário; a string viraria erro em versões futuras do Python | — |
+| RF12-CA4: duplo clique via `QTest.mouseDClick` | Teste usa `mouseClick` + `mouseDClick` | No Qt 6, `mouseDClick` sozinho não gera `itemDoubleClicked` (é como o utilitário de teste funciona; o duplo clique real funciona) | `specs/TECNICO.md` §7, armadilhas de teste (Bloco 3) |
 
 ## 8. Definição de Pronto
-- [ ] Teste de regressão do botão adicionado (falha sem a correção) e `pytest` passando por completo
-- [ ] Delta da seção 5 aplicado em `specs/` e `adr/`, com desvios da seção 7 levados à spec
-- [ ] Matriz de rastreabilidade sem critérios órfãos (lacunas decididas)
-- [ ] Executável gerado e o botão "Fechar" conferido manualmente (RNF08-CA1 no mesmo roteiro)
-- [ ] `STATUS_PROJETO.md`: quadro atualizado e novo registro no histórico
-- [ ] Pasta do pacote movida para `docs/archive/v1.0.1/`; tag `v1.0.1`
+- [x] Teste de regressão do botão adicionado (falha sem a correção) e `pytest` passando por completo · 245 testes, sem avisos
+- [x] Delta da seção 5 aplicado em `specs/` e `adr/`, com desvios da seção 7 levados à spec · Blocos 2 e 3, RF15-CA2 no Bloco 4
+- [x] Matriz de rastreabilidade sem critérios órfãos (lacunas decididas) · 84 critérios, 0 lacunas
+- [x] Executável gerado e o botão "Fechar" conferido manualmente (RNF08-CA1 no mesmo roteiro) · roteiro **M2 confirmado pelo usuário** em 2026-10-29 (`.cbr` real com o UnRAR 7.23, `.cbz`, botão `✕`, `Ctrl + P`, segunda instância, tema e pastas do sistema)
+- [x] `STATUS_PROJETO.md`: quadro atualizado e novo registro no histórico · registros #021–#030
+- [x] Pasta do pacote movida para `docs/archive/v1.0.1/` · `docs/archive/v1.0.1/FIX-01/`; a tag `v1.0.1` é criada pelo usuário junto com o commit de fechamento
 
 ## 9. Aprovação
 - [x] Decisões QA-05 e QA-06 tomadas pelo usuário (2026-10-29)
-- [ ] Este documento revisado e aprovado para implementação (data: AAAA-MM-DD)
+- [x] Este documento revisado e aprovado para implementação (data: 2026-10-29)
+- [x] Entrega validada pelo usuário — roteiro M2 confirmado e FIX-01 dado como concluído com sucesso (2026-10-29)

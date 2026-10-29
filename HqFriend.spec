@@ -10,6 +10,7 @@ a = Analysis(
     datas=[
         ('assets/styles/dark_theme.qss', 'assets/styles'),
         ('assets/icon.ico', 'assets'),
+        ('bin/license.txt', 'bin'),  # Licença freeware do UnRAR, distribuída junto ao binário (ADR-12)
     ],
     hiddenimports=[],
     hookspath=[],

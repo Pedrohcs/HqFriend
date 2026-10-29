@@ -18,7 +18,8 @@ Funciona **100% offline**: não precisa de internet nem de servidor. O progresso
 - **Leitor integrado:**
   - página única ou dupla (pares 1–2, 3–4, …);
   - zoom no ponto do cursor e arrastar a página ampliada;
-  - indicador de página;
+  - indicador de página e botão "Fechar" (`✕`) no canto superior direito;
+  - páginas ilegíveis aparecem como um quadro "Página ilegível", sem interromper a leitura;
   - troca de página em menos de 200 ms, com as próximas páginas carregadas em segundo plano.
 - **Exportação de página (`Ctrl + P`):** salva a página, ou as duas páginas lado a lado, como PNG na resolução original, sem sobrescrever capturas anteriores.
 - **Robustez:**
@@ -167,7 +168,7 @@ graph TD
 | Leitor | `Ctrl + Scroll` | Zoom (0,5x a 5x) |
 | Leitor | Arrastar com o mouse | Mover a página ampliada |
 | Leitor | `Ctrl + P` | Salvar a página como PNG |
-| Leitor | `Esc` | Fechar a HQ |
+| Leitor | `Esc` ou botão `✕` | Fechar a HQ |
 
 ### Onde ficam os dados
 
@@ -200,7 +201,7 @@ Não é preciso instalar Python nem nenhuma dependência.
 **Pré-requisitos**
 - Windows 11 (x64)
 - [Python 3.12+](https://www.python.org/downloads/) (64-bit)
-- `bin\UnRAR.exe`, já incluído no repositório. Para atualizá-lo, copie de `C:\Program Files\WinRAR\UnRAR.exe` ou baixe o *UnRAR for Windows* em [rarlab.com](https://www.rarlab.com/rar_add.htm).
+- `bin\UnRAR.exe` (UNRAR 7.23 freeware) e sua licença `bin\license.txt`, já incluídos no repositório. Para atualizá-los, siga o procedimento da [ADR-12](docs/adr/ADR-12-unrar-embarcado.md) (versão estável e assinada da [RARLAB](https://www.rarlab.com/rar_add.htm)).
 
 **Instalação**
 
@@ -237,7 +238,7 @@ Para gerar de novo as HQs de exemplo usadas nos testes (requer o WinRAR instalad
 .venv\Scripts\pyinstaller.exe --noconfirm --clean HqFriend.spec
 ```
 
-O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR.exe`, o ícone e o tema. Para distribuir, compacte a **pasta inteira** (o `HqFriend.exe` depende da subpasta `_internal\`).
+O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR.exe` (com sua licença), o ícone e o tema. Para distribuir, compacte a **pasta inteira** (o `HqFriend.exe` depende da subpasta `_internal\`).
 
 ---
 
@@ -246,7 +247,7 @@ O resultado fica em `dist\HqFriend\`, com cerca de 128 MB, e já inclui o `UnRAR
 ```text
 HqFriend/
 ├── assets/                  # Ícone e tema Dark Mode (dark_theme.qss)
-├── bin/UnRAR.exe            # Binário embutido para leitura de .cbr
+├── bin/                     # UnRAR.exe (leitura de .cbr) + license.txt (licença freeware)
 ├── docs/                    # Specs vigentes (SDD), ADRs, pacotes de mudança e status
 ├── src/
 │   ├── main.py              # Ponto de entrada
