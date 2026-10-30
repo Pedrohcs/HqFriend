@@ -2,7 +2,7 @@
 
 > **Spec vigente.** Este documento descreve o comportamento **atual** do sistema na branch `main` e deve estar sempre alinhado ao código. Mudanças entram por um pacote em `docs/changes/` (ver `docs/README.md`) e são aplicadas aqui na etapa de **Sincronização**.
 >
-> * **Versão da spec:** `1.1` (2026-10-29) — escopo entregue pelas FEAT-01 a FEAT-13, pelo FIX-01 e pela FEAT-14.
+> * **Versão da spec:** `1.2` (2026-10-30) — escopo entregue pelas FEAT-01 a FEAT-13, pelo FIX-01, pela FEAT-14 e pela FEAT-15.
 > * **Convenções de ID:** `RFxx` / `RNFxx` / `USxx` nunca são reaproveitados. Cada requisito tem critérios de aceite próprios (`RFxx-CAn`), referenciados nos testes e nos pacotes de FIX. Requisitos removidos permanecem no documento com status `Obsoleto (FEAT-NN)`.
 > * **Status de requisito:** `Ativo` | `Obsoleto (FEAT-NN)`. A linha **Origem** indica o pacote que criou o requisito e os que o alteraram depois.
 > * **Verificação:** cada critério é verificado de forma **automática** (teste pytest) ou **manual** (roteiro no executável). A seção 7 (Matriz de Rastreabilidade) liga cada critério à sua verificação. Testes novos citam o critério (`# RF14-CA3`).
@@ -52,11 +52,12 @@ Para cada série listada, o sistema deve contabilizar o total de arquivos `.cbr`
 * **RF04-CA1:** Uma série sem nenhuma HQ lida exibe `0 / Y obras`.
 * **RF04-CA2:** Arquivos removidos do disco não entram no contador `X / Y` (nunca ocorre `12 / 11 obras`), e suas entradas permanecem no `state.json` (ADR-03).
 
-#### RF05 — Listagem de Obras da Série
-`Ativo` · Origem: v1.0 (FEAT-10)
+#### RF05 — Listagem de Obras da Série em Grade de Capas
+`Ativo` · Origem: v1.0 (FEAT-10), FEAT-15
 
-Ao acessar uma série, o sistema deve listar todos os arquivos `.cbr` e `.cbz` pertencentes a ela, exibindo o status individual de leitura (Não lida, Em andamento com página atual, ou Lida).
-* **RF05-CA1:** A Tela da Série lista as HQs em ordem natural (RF18), cada uma com o status `Não lida`, `Em andamento – Pág. X/Y` ou `Lida`.
+Ao acessar uma série, o sistema deve exibir todos os arquivos `.cbr` e `.cbz` pertencentes a ela em uma **grade de capas com 5 colunas**, em ordem natural (RF18), da esquerda para a direita e de cima para baixo. Cada card exibe a capa da HQ (RF22), o nome do arquivo e o status individual de leitura (Não lida, Em andamento com página atual, ou Lida).
+* **RF05-CA1:** A Tela da Série exibe as HQs em uma grade de capas em ordem natural (RF18); cada card mostra a capa, o nome do arquivo (abreviado com reticências quando não couber, com o nome completo no *tooltip*) e o status `Não lida`, `Em andamento – Pág. X/Y` ou `Lida`, nas cores do RNF08-CA2.
+* **RF05-CA2:** A grade tem sempre 5 colunas: a largura dos cards acompanha a largura da janela, com a capa na proporção 2:3, e as linhas seguintes ficam acessíveis por rolagem vertical, sem rolagem horizontal. A largura de cada card não fica abaixo de 120 px: a Tela da Série não encolhe abaixo de 5 cards dessa largura (QA-11).
 
 #### RF18 — Ordenação Natural de Séries e Obras
 `Ativo` · Origem: v1.0 (FEAT-02, FEAT-06)
@@ -127,7 +128,7 @@ Critérios de aceite:
 * **RF10-CA2:** "Marcar como não lida" marca todas as HQs como não lidas, zera os bookmarks e atualiza o card para "Não lida" e `0 / Y obras`.
 * **RF10-CA3:** Cada opção fica desabilitada quando a série já está no status correspondente.
 
-### 2.3. Customização de Capa da Série
+### 2.3. Capas de Séries e HQs
 
 #### RF11 — Ação de Seleção de Capa (Menu de Contexto)
 `Ativo` · Origem: v1.0 (FEAT-07, FEAT-08)
@@ -149,6 +150,26 @@ Critérios de aceite:
 * **RF12-CA2:** A interface não trava durante o carregamento das miniaturas; fechar o diálogo ou trocar de HQ antes do fim interrompe o carregamento e libera o arquivo.
 * **RF12-CA3:** Ao confirmar a página, o arquivo em `covers\` e o `state.json` são atualizados imediatamente e o card da série na Tela Inicial exibe a nova capa.
 * **RF12-CA4:** O passo 1 abre com a HQ da capa atual já selecionada (ou a primeira HQ, se a capa for a padrão); no passo 2, "Definir como capa" só fica habilitado com uma página selecionada, e o duplo clique numa miniatura confirma.
+
+#### RF22 — Capa Padrão da HQ
+`Ativo` · Origem: FEAT-15
+
+Toda HQ (`.cbr`/`.cbz`) válida possui uma capa, exibida no seu card na Tela da Série (RF05). Enquanto o usuário não escolher outra (RF23), a capa é a **primeira página do arquivo**, isto é, a primeira imagem na ordenação natural das páginas (RNF04, RF18). As capas são geradas em segundo plano ao abrir a série, apenas para as HQs que ainda não têm capa em cache (QA-14), e ficam guardadas para as próximas aberturas.
+* **RF22-CA1:** Ao abrir a Tela da Série, cada HQ sem capa em cache exibe o *placeholder* "Carregando capa…" e as capas são geradas em segundo plano, na ordem da grade, aparecendo uma a uma sem travar a interface.
+* **RF22-CA2:** A capa padrão é a primeira página do arquivo em ordem natural, gravada em `%DOCUMENTOS%\HqFriend\covers\<Série>\<arquivo>.png` (ex: `covers\Batman\Batman_01.cbz.png`), com no máximo 400 px de largura, mantendo a proporção e sem ampliar.
+* **RF22-CA3:** HQ cuja capa já está em cache exibe a capa sem reabrir o arquivo compactado, inclusive depois de reiniciar o aplicativo.
+* **RF22-CA4:** HQ inválida (RF20) ou com a primeira página ilegível exibe o *placeholder* "Sem capa"; a falha é registrada em log e não impede a geração das demais capas.
+* **RF22-CA5:** Sair da Tela da Série (`Esc`, "Voltar") ou abrir uma HQ no leitor interrompe a geração após a capa em andamento, liberando o arquivo; ao voltar à Tela da Série, a geração continua pelas capas que faltam.
+
+#### RF23 — Seleção da Capa da HQ (Menu de Contexto)
+`Ativo` · Origem: FEAT-15
+
+Na Tela da Série, ao clicar com o botão direito sobre uma HQ, o menu exibe **"Selecionar imagem de capa"** e, quando a HQ tiver capa customizada, **"Restaurar capa padrão"**, além da opção de marcar como lida ou não lida (RF08). "Selecionar imagem de capa" abre a galeria de miniaturas das páginas **da própria HQ**, onde o usuário clica numa página para defini-la como capa (QA-13). A capa da HQ é independente da capa da série (QA-12).
+* **RF23-CA1:** O menu de contexto da HQ exibe "Selecionar imagem de capa" e, apenas quando há capa customizada, "Restaurar capa padrão"; as opções de RF08 continuam no menu.
+* **RF23-CA2:** A galeria exibe apenas as páginas da HQ escolhida, carregadas em segundo plano; fechar o diálogo antes do fim interrompe o carregamento e libera o arquivo. A página da capa atual já vem selecionada (a página 1, se a capa for a padrão); "Definir como capa" só fica habilitado com uma página selecionada, e o duplo clique numa miniatura confirma. Numa HQ inválida, o diálogo exibe a mensagem de erro e nada é alterado.
+* **RF23-CA3:** Ao confirmar a página, o arquivo da capa em `covers\<Série>\` e o `state.json` (`custom_cover_page` da HQ) são atualizados imediatamente e o card da HQ exibe a nova capa. O card da série na Tela Inicial não muda.
+* **RF23-CA4:** "Restaurar capa padrão" regera a capa a partir da primeira página e remove a referência customizada do `state.json`.
+* **RF23-CA5:** Se a capa customizada precisar ser regerada (arquivo do cache apagado) e a página registrada não existir mais no arquivo (ex: HQ substituída por versão menor), é usada a capa padrão e o problema é registrado em log.
 
 ### 2.4. Leitor Integrado de HQs e Atalhos
 
@@ -236,16 +257,19 @@ O sistema deve rodar de forma 100% local no computador do usuário (ambiente Win
 * **RNF01-CA2:** Leitura de `.cbz`/`.cbr`, persistência, logs e exportação `Ctrl + P` funcionam a partir do executável, sem internet e sem instalações adicionais.
 
 #### RNF02 — Armazenamento de Memória e Estado
-`Ativo` · Origem: v1.0 (FEAT-02, FEAT-03)
+`Ativo` · Origem: v1.0 (FEAT-02, FEAT-03), FEAT-15
 
-Toda a memória do sistema (diretório raiz configurado, progresso de leitura por arquivo, página atual/bookmark, status das séries e cache de capas selecionadas) deve ser armazenada no diretório `%DOCUMENTOS%\HqFriend`, utilizando arquivo estruturado em formato **JSON** (`state.json`) e subpasta de cache de capas (`covers\`).
+Toda a memória do sistema (diretório raiz configurado, progresso de leitura por arquivo, página atual/bookmark, status das séries, capas customizadas de séries e HQs e cache de capas) deve ser armazenada no diretório `%DOCUMENTOS%\HqFriend`, utilizando arquivo estruturado em formato **JSON** (`state.json`) e subpasta de cache de capas (`covers\`).
 * *Integridade:* A gravação deve ser atômica. O sistema deve manter uma cópia de segurança (`state.json.bak`) da última versão válida carregada. Se o `state.json` estiver corrompido, o sistema deve preservá-lo para análise, restaurar a partir do `.bak` (ou iniciar com estado limpo, caso o backup também seja inválido) e avisar o usuário.
+* *Versão do schema:* um `state.json` de versão anterior é migrado na carga, sem perda de dados; um `state.json` de versão mais nova que a suportada nunca é sobrescrito (`ARQUITETURA.md` §3.3).
 
 Critérios de aceite:
 * **RNF02-CA1:** Na primeira abertura (sem `state.json`), o sistema cria e usa um estado limpo, válido e versionado (contrato em `ARQUITETURA.md` §3.2).
 * **RNF02-CA2:** A carga valida tipos, datas e enums do JSON.
 * **RNF02-CA3:** A escrita passa por arquivo temporário (`state.json.tmp` → `state.json`), sem deixar arquivos órfãos, e supera bloqueios transitórios (`PermissionError`) com novas tentativas.
 * **RNF02-CA4:** Um `state.json` inválido é preservado como `state.corrupt-<timestamp>.json`, o estado é restaurado do `.bak` e o usuário é avisado; se o `.bak` também for inválido, o sistema inicia limpo sem falhar.
+* **RNF02-CA5:** Um `state.json` da versão `1.0` é carregado e migrado para `1.1` preservando raiz, progresso, preferências e capas das séries; antes da primeira gravação do estado migrado, uma cópia do arquivo original é guardada como `state.v1.0.json`.
+* **RNF02-CA6:** Um `state.json` de versão mais nova que a suportada não é sobrescrito nem tratado como corrompido: o sistema avisa o usuário ("O arquivo de estado é de uma versão mais nova do HqFriend…") e encerra.
 
 #### RNF03 — Criação Automática de Diretórios de Sistema
 `Ativo` · Origem: v1.0 (FEAT-01, FEAT-12)
@@ -255,7 +279,7 @@ Caso os diretórios `%DOCUMENTOS%\HqFriend` (e subpastas `covers\` e `logs\`) ou
 * **RNF03-CA2:** `%DOCUMENTOS%` e `%IMAGENS%` correspondem às pastas reais do usuário, inclusive quando redirecionadas ao OneDrive (nenhum caminho com nome de usuário fixo no código — ADR-05).
 
 #### RNF04 — Suporte a Formatos de Compactação em Memória
-`Ativo` · Origem: v1.0 (FEAT-05, FEAT-13)
+`Ativo` · Origem: v1.0 (FEAT-05, FEAT-13), FEAT-15
 
 O motor de leitura deve descompactar diretamente em memória RAM (sem arquivos temporários em disco) arquivos compactados tanto em formato ZIP (`.cbz`) quanto RAR (`.cbr`), utilizando binário embarcado para RAR, identificando o formato real pelo conteúdo do arquivo (e não apenas pela extensão) e filtrando apenas extensões de imagem válidas (`.jpg`, `.jpeg`, `.png`, `.webp`) em ordem alfanumérica natural.
 * **RNF04-CA1:** `.cbz` e `.cbr` (RAR4, RAR5 e *solid*) listam as páginas em ordem natural (`1.jpg`, `2.jpg`, ..., `10.jpg`), ignorando `__MACOSX` e arquivos ocultos.
@@ -263,14 +287,16 @@ O motor de leitura deve descompactar diretamente em memória RAM (sem arquivos t
 * **RNF04-CA3:** Abrir um `.cbr` executa **um único** processo `UnRAR.exe`, e os bytes de cada página são idênticos aos obtidos por `rarfile` (ADR-06).
 * **RNF04-CA4:** Um ZIP com extensão `.cbr` (e um RAR com extensão `.cbz`) é aberto corretamente.
 * **RNF04-CA5:** Nenhuma janela de console pisca ao abrir um `.cbr` a partir do executável; o `UnRAR.exe` embarcado é resolvido tanto no código-fonte quanto no `.exe`.
+* **RNF04-CA6:** Gerar a capa de um `.cbr` (da série ou da HQ) executa um único processo `UnRAR.exe` que extrai apenas a entrada da página necessária, sem extrair o arquivo inteiro para a RAM; os bytes obtidos são idênticos aos de `rarfile` (ADR-14).
 
 #### RNF05 — Desempenho de Renderização
-`Ativo` · Origem: v1.0 (FEAT-07, FEAT-08, FEAT-09, FEAT-11)
+`Ativo` · Origem: v1.0 (FEAT-07, FEAT-08, FEAT-09, FEAT-11), FEAT-15
 
-A transição entre páginas no leitor deve ocorrer de maneira fluida (tempo de resposta inferior a 200ms após o carregamento do arquivo). A varredura da biblioteca, a geração de capas padrão e o carregamento da galeria de seleção de capas (RF12) devem ocorrer de forma assíncrona, mantendo a interface responsiva.
+A transição entre páginas no leitor deve ocorrer de maneira fluida (tempo de resposta inferior a 200ms após o carregamento do arquivo). A varredura da biblioteca, a geração de capas padrão (das séries e das HQs) e o carregamento da galeria de seleção de capas (RF12, RF23) devem ocorrer de forma assíncrona, mantendo a interface responsiva.
 * **RNF05-CA1:** Virar a página leva menos de 200 ms (referência v1.0: máx. 133 ms com páginas JPEG de ~3 MB em 1920×1080).
 * **RNF05-CA2:** A interface permanece responsiva durante a varredura e a geração de capas de uma biblioteca com 100+ séries.
 * **RNF05-CA3:** As camadas de domínio, serviços e infraestrutura não importam PySide6 (pré-condição para executá-las fora da thread de UI).
+* **RNF05-CA4:** A Tela da Série de uma série com 100+ HQs abre de imediato e continua respondendo (rolagem, menu de contexto, duplo clique, "Voltar") enquanto as capas das HQs são geradas.
 
 #### RNF06 — Registro de Erros (Logs)
 `Ativo` · Origem: v1.0 (FEAT-01, FEAT-08)
@@ -301,7 +327,7 @@ A interface deve usar um tema escuro único, definido em uma folha de estilos em
 * **US03 — Atualização Dinâmica de Série com Novos Arquivos:** Como leitor, quero que uma série anteriormente "Lida" passe automaticamente para "Em andamento" caso eu adicione novos arquivos `.cbr`/`.cbz` na pasta dela, sem precisar reiniciar o sistema.
 * **US04 — Seleção de Capa da Série por HQ:** Como leitor, quero clicar com o botão direito em uma série e escolher "Selecionar imagem de capa", escolhendo primeiro qual HQ daquela série desejo abrir em pré-visualização e, em seguida, selecionando uma de suas páginas para ser a capa da série. Quero também poder restaurar a capa padrão.
 * **US05 — Marcação de Série em Lote:** Como leitor, quero clicar com o botão direito em uma série e escolher "Marcar como lida" ou "Marcar como não lida" para que a série e todas as suas HQs internas sejam atualizadas de uma só vez.
-* **US06 — Listagem e Marcação Manual de HQ:** Como leitor, quero abrir uma série para ver seus arquivos `.cbr`/`.cbz` em ordem natural e poder clicar com o botão direito em uma HQ específica para marcá-la manualmente como "Lida" ou "Não lida".
+* **US06 — Listagem e Marcação Manual de HQ:** Como leitor, quero abrir uma série para ver seus arquivos `.cbr`/`.cbz` em uma grade de capas, em ordem natural, e poder clicar com o botão direito em uma HQ específica para marcá-la manualmente como "Lida" ou "Não lida".
 * **US07 — Leitura e Retomada de Progresso (Bookmark):** Como leitor, quero dar duplo clique em uma HQ para lê-la usando as `Setas (Esquerda/Direita)` ou `Espaço`, e quero que o sistema lembre em qual página parei caso eu feche antes do fim.
 * **US08 — Conclusão Automática ao Atingir a Última Página:** Como leitor, quero que a HQ seja marcada automaticamente como "Lida" quando a última página aparecer na tela, atualizando o contador da série e marcando a série como "Lida" caso seja a última obra pendente.
 * **US09 — Controle de Zoom na Leitura:** Como leitor, quero usar `Ctrl + Scroll do mouse` para ajustar o zoom da página durante a leitura e que esse zoom seja mantido quando eu virar a página, para não precisar ajustá-lo de novo a cada página.
@@ -309,6 +335,7 @@ A interface deve usar um tema escuro único, definido em uma folha de estilos em
 * **US11 — Captura de Página Unificada ou Simples:** Como leitor, quero usar `Ctrl + P` para salvar a visualização atual em `%IMAGENS%\HQs` com o nome `NomeDaSerie_NomeDoArquivo_PagXX.png`, unindo as duas páginas lado a lado (centralizadas sobre fundo preto) em uma única imagem quando eu estiver no modo de página dupla, sem sobrescrever capturas anteriores.
 * **US12 — Persistência Local Transparente:** Como leitor, quero que todo o meu histórico de leitura, diretório configurado, páginas atuais e capas escolhidas fiquem salvos em estrutura JSON dentro de `%DOCUMENTOS%\HqFriend`, protegidos contra corrupção.
 * **US13 — Atualização Manual da Biblioteca:** Como leitor, quero pressionar `F5` (ou o botão "Atualizar") para que o sistema reconheça imediatamente arquivos e séries que adicionei ou removi.
+* **US14 — Capas das HQs na Tela da Série:** Como leitor, quero ver as HQs de uma série como uma grade de capas e poder escolher, pelo botão direito, qual página é a capa de cada HQ, para reconhecer cada edição de relance.
 
 ---
 
@@ -345,14 +372,21 @@ graph TD
     RestoreCover --> SaveJSON1
 
     %% Navegação dentro da Série
-    Home -->|Clique na Série| SeriesView[Tela da Série: Lista de HQs .cbr/.cbz]
+    Home -->|Clique na Série| SeriesView[Tela da Série: grade de capas<br/>5 colunas, HQs .cbr/.cbz]
     SeriesView -->|Voltar| ScanSeries
+    SeriesView -->|HQs sem capa em cache| GenHqCovers[Gerar capas das HQs em segundo plano<br/>1ª página de cada arquivo<br/>Documentos\HqFriend\covers\Série\]
+    GenHqCovers --> SeriesView
 
     %% Menu de Contexto na HQ (Botão Direito)
     SeriesView -->|Botão Direito na HQ| HqCtx{Menu de Contexto da HQ}
     HqCtx -->|Alternar Lida / Não Lida| ToggleHqStatus[Atualiza status da HQ<br/>Não Lida zera bookmark<br/>Recalcula contador X/Y da Série]
     ToggleHqStatus --> SaveJSON2[(Atualizar state.json)]
     SaveJSON2 --> SeriesView
+    HqCtx -->|Selecionar imagem de capa| PickHqCover[Galeria de páginas da HQ<br/>usuário escolhe a capa]
+    PickHqCover --> SaveHqCover[Salvar capa da HQ em covers\Série\<br/>e registrar a página da HQ]
+    SaveHqCover --> SaveJSON2
+    HqCtx -->|Restaurar capa padrão| RestoreHqCover[Regerar capa a partir da<br/>1ª página da HQ]
+    RestoreHqCover --> SaveJSON2
 
     %% Leitor de HQ (Duplo Clique)
     SeriesView -->|Duplo Clique na HQ| CheckValid{Arquivo válido e<br/>com imagens?}
@@ -415,10 +449,16 @@ graph TD
 | **QA-08** | Com a página ampliada, que parte da nova página aparece ao virar? | **Decidida em 2026-10-29 (FEAT-14):** o canto superior esquerdo, ao avançar e ao voltar (RF15-CA3). | Topo centralizado na horizontal. Mesma posição relativa da página anterior. Voltar abrindo no canto inferior direito. |
 | **QA-09** | O que acontece com o zoom ao alternar o modo único/duplo (`Ctrl + S`)? | **Decidida em 2026-10-29 (FEAT-14):** restaura o ajuste à tela, como na v1.0 (RF15-CA2): a troca de layout muda o tamanho do conteúdo. | Manter o fator de zoom também na alternância. |
 | **QA-10** | Como voltar ao ajuste à tela, já que virar a página deixa de fazer isso? | **Decidida em 2026-10-29 (FEAT-14):** atalho `Ctrl + 0` (RF15-CA5). | Sem atalho novo (reduzir com `Ctrl + Scroll` ou alternar o modo duas vezes). `Ctrl + 0` e também duplo clique na página. |
+| **QA-11** | Como funciona a "grade 5x5" de capas da Tela da Série? | **Decidida em 2026-10-29 (FEAT-15):** sempre 5 colunas; os cards acompanham a largura da janela e as linhas seguem com rolagem vertical (RF05-CA2). | Páginas de exatamente 25 HQs com botões Anterior/Próxima. Colunas responsivas com cards de tamanho fixo, como na Tela Inicial. |
+| **QA-12** | A capa escolhida para uma HQ afeta a capa da série? | **Decidida em 2026-10-29 (FEAT-15):** não; as capas são independentes e a capa padrão da série continua sendo a 1ª página da 1ª HQ (RF11, RF23-CA3). | Sem capa customizada, a série herdar a capa (padrão ou customizada) da 1ª HQ. |
+| **QA-13** | De onde vem a imagem ao escolher a capa de uma HQ? | **Decidida em 2026-10-29 (FEAT-15):** só das páginas da própria HQ; o seletor abre direto na galeria (RF23). | Fluxo em 2 etapas com página de outra HQ da série. Imagem do computador. |
+| **QA-14** | Quando as capas das HQs são geradas? | **Decidida em 2026-10-29 (FEAT-15):** ao abrir a série, só para as HQs dela sem capa em cache (RF22). | Na varredura da biblioteca, para todas as HQs de todas as séries (abre milhares de arquivos na primeira execução). |
 
 > **Limitações conhecidas (aceitas com a QA-01):**
 > * Uma segunda biblioteca com séries e arquivos de mesmo nome herda o progresso já registrado para esses nomes.
 > * Renomear uma pasta de série ou um arquivo `.cbr`/`.cbz` faz o sistema tratá-lo como novo, perdendo o progresso associado ao nome anterior.
+>
+> **Limitação conhecida (FEAT-15):** as capas em cache (de séries e de HQs) não são regeradas quando um arquivo é substituído por outro de mesmo nome; "Restaurar capa padrão" regera a capa sob demanda.
 
 ---
 
@@ -426,7 +466,7 @@ graph TD
 
 > Liga cada critério de aceite à sua verificação. Ao criar ou alterar um critério, o pacote (FEAT/FIX) atualiza a linha correspondente na etapa de Sincronização.
 
-**Resumo (FEAT-14, 2026-10-29):** 87 critérios — 74 automáticos, 9 automáticos com complemento manual, 4 manuais e 0 lacunas. A FEAT-14 acrescentou RF15-CA3 a CA5 e passou RF15-CA2, CA3 e CA5 a ter complemento manual no roteiro M2. Caminhos relativos a `tests/`. As 3 lacunas encontradas na montagem da matriz (RF15-CA2, RF17-CA4 e RNF06-CA2) foram cobertas por testes no próprio FIX-01. Uma **lacuna** é um critério sem teste nem roteiro que o cubra por inteiro; cada lacuna é resolvida criando o teste ou aceitando-a como manual, com registro no pacote.
+**Resumo (FEAT-15, 2026-10-30):** 102 critérios — 85 automáticos, 13 automáticos com complemento manual, 4 manuais e 0 lacunas. A FEAT-15 acrescentou RF05-CA2, RF22-CA1 a CA5, RF23-CA1 a CA5, RNF02-CA5/CA6, RNF04-CA6 e RNF05-CA4, alterou RF05-CA1 e passou RF05-CA2, RF22-CA1, RNF04-CA6 (roteiro M2, passo 7) e RNF05-CA4 (roteiro M3, passo 3) a ter complemento manual. Conferida automaticamente: os 199 testes citados existem na coleta do pytest (353 testes). **Resumo anterior (FEAT-14, 2026-10-29):** 87 critérios — 74 automáticos, 9 automáticos com complemento manual, 4 manuais e 0 lacunas. A FEAT-14 acrescentou RF15-CA3 a CA5 e passou RF15-CA2, CA3 e CA5 a ter complemento manual no roteiro M2. Caminhos relativos a `tests/`. As 3 lacunas encontradas na montagem da matriz (RF15-CA2, RF17-CA4 e RNF06-CA2) foram cobertas por testes no próprio FIX-01. Uma **lacuna** é um critério sem teste nem roteiro que o cubra por inteiro; cada lacuna é resolvida criando o teste ou aceitando-a como manual, com registro no pacote.
 
 | Critério | Verificação | Teste(s) / roteiro |
 | :--- | :--- | :--- |
@@ -441,7 +481,8 @@ graph TD
 | RF03-CA3 | Automática | `infrastructure/test_fs_scanner.py::test_raiz_inexistente_retorna_resultado_vazio`<br>`infrastructure/test_fs_scanner.py::test_raiz_que_e_arquivo_retorna_resultado_vazio`<br>`infrastructure/test_fs_scanner.py::test_serie_inacessivel_e_ignorada_sem_afetar_as_demais` |
 | RF04-CA1 | Automática | `services/test_library_service.py::test_serie_nova_comeca_nao_lida_com_contador_zero`<br>`domain/test_models.py::test_contador_da_serie_usa_formato_x_de_y` |
 | RF04-CA2 | Automática | `services/test_library_service.py::test_arquivos_removidos_nao_inflam_contador_e_permanecem_no_json`<br>`services/test_library_service.py::test_arquivo_removido_que_volta_recupera_progresso` |
-| RF05-CA1 | Automática | `ui/test_series_view.py::test_lista_hqs_da_serie_em_ordem_natural_com_status`<br>`ui/test_series_view.py::test_texto_de_status_da_hq`<br>`ui/test_series_view.py::test_mostra_hq_em_andamento_com_pagina` |
+| RF05-CA1 | Automática | `ui/test_series_view.py::test_lista_hqs_da_serie_em_ordem_natural_com_status`<br>`ui/test_series_view.py::test_texto_de_status_da_hq`<br>`ui/test_series_view.py::test_mostra_hq_em_andamento_com_pagina`<br>`ui/test_series_view.py::test_card_abrevia_nome_e_mostra_nome_completo_no_tooltip`<br>`ui/test_series_view.py::test_marcar_hq_mantem_a_selecao_e_a_rolagem` |
+| RF05-CA2 | Automática + Manual | `ui/test_series_view.py::test_grade_tem_sempre_cinco_colunas`<br>`ui/test_series_view.py::test_cards_tem_largura_minima_de_120_px`<br>`ui/test_series_view.py::test_cards_acompanham_a_largura_da_janela`<br>Roteiro M2 (grade) |
 | RF18-CA1 | Automática | `domain/test_sorting.py::test_ordena_numeros_como_humanos_e_ignora_maiusculas` |
 | RF18-CA2 | Automática | `services/test_library_service.py::test_series_e_hqs_em_ordem_natural`<br>`domain/test_sorting.py::test_ordena_paginas_de_arquivo_compactado`<br>`infrastructure/test_archive_reader.py::test_lista_apenas_imagens_em_ordem_natural` |
 | RF19-CA1 | Automática | `ui/test_home_view.py::test_novo_arquivo_e_atualizacao_refletem_no_contador`<br>`ui/test_home_view.py::test_f5_esta_associado_a_atualizacao` |
@@ -472,6 +513,16 @@ graph TD
 | RF12-CA2 | Automática | `ui/test_cover_picker_dialog.py::test_miniaturas_sao_extraidas_fora_da_thread_principal`<br>`ui/test_cover_picker_dialog.py::test_fechar_durante_carregamento_interrompe_e_libera_arquivo`<br>`ui/test_cover_picker_dialog.py::test_trocar_de_hq_durante_carregamento_descarta_miniaturas_antigas`<br>`services/test_cover_service.py::test_interromper_miniaturas_libera_o_arquivo` |
 | RF12-CA3 | Automática | `services/test_cover_service.py::test_capa_customizada_atualiza_cache_e_estado`<br>`ui/test_cover_picker_dialog.py::test_confirmar_define_capa_da_serie`<br>`ui/test_cover_picker_dialog.py::test_menu_da_home_abre_seletor_e_atualiza_card` |
 | RF12-CA4 | Automática | `ui/test_cover_picker_dialog.py::test_reabrir_seletor_parte_da_hq_da_capa_atual`<br>`ui/test_cover_picker_dialog.py::test_botao_de_confirmar_exige_pagina_selecionada`<br>`ui/test_cover_picker_dialog.py::test_duplo_clique_na_miniatura_confirma_a_capa` |
+| RF22-CA1 | Automática + Manual | `ui/test_series_view.py::test_capas_das_hqs_sao_geradas_fora_da_thread_principal`<br>`ui/test_comic_cover_worker.py::test_gera_as_capas_em_ordem_fora_da_thread_principal`<br>`ui/test_series_view.py::test_marcar_hq_durante_a_geracao_mantem_carregando_capa`<br>`ui/test_series_view.py::test_capa_de_outra_serie_e_ignorada`<br>Roteiro M2 (grade) |
+| RF22-CA2 | Automática | `services/test_cover_service.py::test_capa_da_hq_e_a_primeira_pagina_em_ordem_natural`<br>`services/test_cover_service.py::test_capa_da_hq_e_reduzida_e_gravada_em_covers_da_serie`<br>`services/test_library_service.py::test_capa_da_hq_fica_na_pasta_da_serie_com_a_extensao_no_nome` |
+| RF22-CA3 | Automática | `services/test_cover_service.py::test_capa_da_hq_em_cache_nao_reabre_o_arquivo`<br>`services/test_library_service.py::test_hq_com_capa_em_cache_e_hqs_sem_capa`<br>`ui/test_series_view.py::test_capas_em_cache_aparecem_sem_gerar_de_novo` |
+| RF22-CA4 | Automática | `services/test_cover_service.py::test_hq_invalida_fica_sem_capa_e_nao_impede_as_demais`<br>`ui/test_series_view.py::test_hq_invalida_mostra_placeholder_sem_capa`<br>`ui/test_comic_cover_worker.py::test_hq_invalida_e_emitida_sem_capa` |
+| RF22-CA5 | Automática | `ui/test_series_view.py::test_sair_da_serie_interrompe_a_geracao_e_libera_o_arquivo`<br>`ui/test_series_view.py::test_voltar_a_serie_retoma_as_capas_que_faltam`<br>`ui/test_comic_cover_worker.py::test_interrupcao_para_apos_a_capa_em_andamento`<br>`ui/test_series_view.py::test_abrir_hq_interrompe_e_fechar_o_leitor_retoma_as_capas` |
+| RF23-CA1 | Automática | `ui/test_series_view.py::test_menu_da_hq_oferece_capa_e_restaurar_apenas_com_capa_customizada`<br>`ui/test_cover_picker_dialog.py::test_confirmar_capa_da_hq_atualiza_o_card_da_hq` |
+| RF23-CA2 | Automática | `ui/test_cover_picker_dialog.py::test_modo_hq_mostra_so_as_paginas_da_hq_sem_passo_1`<br>`ui/test_cover_picker_dialog.py::test_modo_hq_preseleciona_a_pagina_da_capa_atual`<br>`ui/test_cover_picker_dialog.py::test_modo_hq_com_hq_invalida_mostra_erro`<br>`ui/test_cover_picker_dialog.py::test_modo_hq_fechar_durante_carregamento_libera_arquivo` |
+| RF23-CA3 | Automática | `services/test_cover_service.py::test_capa_customizada_da_hq_atualiza_cache_e_estado`<br>`services/test_cover_service.py::test_capa_da_hq_nao_altera_capa_da_serie`<br>`ui/test_cover_picker_dialog.py::test_confirmar_capa_da_hq_atualiza_o_card_da_hq`<br>`services/test_library_service.py::test_capa_customizada_da_hq_e_persistida_e_restaurada`<br>`services/test_library_service.py::test_capa_da_hq_nao_altera_a_referencia_de_capa_da_serie`<br>`ui/test_cover_picker_dialog.py::test_modo_hq_confirmar_define_capa_da_hq_e_nao_da_serie` |
+| RF23-CA4 | Automática | `services/test_cover_service.py::test_restaurar_capa_padrao_da_hq`<br>`services/test_library_service.py::test_capa_customizada_da_hq_e_persistida_e_restaurada`<br>`ui/test_series_view.py::test_menu_da_hq_oferece_capa_e_restaurar_apenas_com_capa_customizada` |
+| RF23-CA5 | Automática | `services/test_cover_service.py::test_pagina_customizada_inexistente_usa_capa_padrao`<br>`services/test_cover_service.py::test_capa_customizada_apagada_e_regerada_da_pagina_registrada` |
 | RF13-CA1 | Automática | `ui/test_reader_view.py::test_duplo_clique_em_hq_valida_abre_o_leitor`<br>`ui/test_series_view.py::test_duplo_clique_solicita_abertura_da_hq` |
 | RF13-CA2 | Automática | `ui/test_reader_view.py::test_duplo_clique_em_hq_valida_abre_o_leitor`<br>`ui/test_reader_view.py::test_botao_fechar_volta_para_a_serie` |
 | RF20-CA1 | Automática | `infrastructure/test_archive_reader.py::test_arquivo_invalido_lanca_invalid_comic_error`<br>`services/test_reader_service.py::test_hq_invalida_nao_abre_e_nao_altera_estado` |
@@ -502,6 +553,8 @@ graph TD
 | RNF02-CA2 | Automática | `domain/test_models.py::test_desserializa_json_existente_com_tipos_datas_e_enums`<br>`domain/test_models.py::test_rejeita_valores_invalidos`<br>`domain/test_models.py::test_rejeita_json_malformado` |
 | RNF02-CA3 | Automática | `infrastructure/test_json_repository.py::test_save_e_atomico_e_nao_deixa_arquivo_temporario`<br>`infrastructure/test_json_repository.py::test_permission_error_transitorio_e_superado`<br>`infrastructure/test_json_repository.py::test_permission_error_persistente_propaga_e_remove_temporario` |
 | RNF02-CA4 | Automática | `infrastructure/test_json_repository.py::test_estado_corrompido_e_restaurado_do_backup`<br>`infrastructure/test_json_repository.py::test_estado_corrompido_sem_backup_retorna_estado_limpo`<br>`infrastructure/test_json_repository.py::test_estado_e_backup_corrompidos_retornam_estado_limpo`<br>`domain/test_errors.py::test_aviso_de_recuperacao_informa_a_origem` |
+| RNF02-CA5 | Automática | `infrastructure/test_state_migrations.py::test_migra_json_1_0_para_1_1_sem_perder_dados`<br>`infrastructure/test_state_migrations.py::test_json_sem_versao_e_tratado_como_1_0`<br>`infrastructure/test_json_repository.py::test_estado_migrado_guarda_copia_do_original`<br>`infrastructure/test_json_repository.py::test_copia_do_original_nao_e_sobrescrita`<br>`infrastructure/test_json_repository.py::test_backup_1_0_e_migrado_na_recuperacao` |
+| RNF02-CA6 | Automática | `infrastructure/test_json_repository.py::test_versao_futura_nao_e_sobrescrita_nem_tratada_como_corrompida`<br>`infrastructure/test_state_migrations.py::test_versao_futura_lanca_erro`<br>`ui/test_main.py::test_versao_futura_avisa_e_encerra`<br>`ui/test_main.py::test_mensagem_de_versao_futura_informa_as_versoes` |
 | RNF03-CA1 | Automática | `infrastructure/test_fs_scanner.py::test_cria_pastas_inexistentes`<br>`infrastructure/test_fs_scanner.py::test_pastas_padrao_sao_as_quatro_pastas_do_sistema`<br>`services/test_export_service.py::test_cria_a_pasta_de_exportacao` |
 | RNF03-CA2 | Automática | `test_config.py::test_pastas_conhecidas_do_usuario_existem`<br>`test_config.py::test_pastas_do_sistema_derivam_das_pastas_conhecidas`<br>`test_config.py::test_codigo_nao_contem_caminho_de_usuario_fixo` |
 | RNF04-CA1 | Automática | `infrastructure/test_archive_reader.py::test_lista_apenas_imagens_em_ordem_natural`<br>`infrastructure/test_archive_reader.py::test_fixture_solid_e_realmente_solid` |
@@ -509,9 +562,11 @@ graph TD
 | RNF04-CA3 | Automática | `infrastructure/test_archive_reader.py::test_cbr_executa_um_unico_processo_sem_janela`<br>`infrastructure/test_archive_reader.py::test_extrai_bytes_identicos_e_imagens_validas` |
 | RNF04-CA4 | Automática | `infrastructure/test_archive_reader.py::test_detecta_formato_real_pelos_magic_bytes` |
 | RNF04-CA5 | Automática + Manual | `infrastructure/test_archive_reader.py::test_cbr_executa_um_unico_processo_sem_janela`<br>`test_config.py::test_resource_path_no_executavel_usa_meipass`<br>Roteiro M2 (`.cbr` no executável) |
+| RNF04-CA6 | Automática + Manual | `infrastructure/test_archive_reader.py::test_read_page_extrai_so_a_entrada_em_um_processo`<br>`infrastructure/test_archive_reader.py::test_read_page_devolve_os_mesmos_bytes_que_open_archive`<br>`infrastructure/test_archive_reader.py::test_read_page_distingue_paginas_de_mesmo_nome_em_subpastas`<br>`infrastructure/test_archive_reader.py::test_read_page_com_extracao_divergente_lanca_invalid_comic_error`<br>`services/test_cover_service.py::test_capas_das_series_usam_leitura_de_pagina_unica`<br>Roteiro M2 (capas de `.cbr` no executável) |
 | RNF05-CA1 | Manual | Roteiro M3 (medição; referência v1.0: máx. 133 ms) |
 | RNF05-CA2 | Automática + Manual | `ui/test_home_view.py::test_varredura_ocorre_fora_da_thread_principal`<br>Roteiro M3 (biblioteca com 100+ séries) |
 | RNF05-CA3 | Automática | `services/test_cover_service.py::test_camadas_de_dominio_servicos_e_infraestrutura_nao_importam_pyside6` |
+| RNF05-CA4 | Automática + Manual | `ui/test_series_view.py::test_capas_das_hqs_sao_geradas_fora_da_thread_principal`<br>`ui/test_comic_cover_worker.py::test_gera_as_capas_em_ordem_fora_da_thread_principal`<br>Roteiro M3 (série com 100+ HQs `.cbr`) |
 | RNF06-CA1 | Automática | `infrastructure/test_logging_setup.py::test_excepthook_registra_excecao_e_aciona_callback`<br>`infrastructure/test_logging_setup.py::test_threading_excepthook_registra_excecao_e_aciona_callback`<br>`infrastructure/test_logging_setup.py::test_configure_grava_mensagens_no_arquivo_de_log`<br>`ui/test_error_dialog.py::test_excecao_nao_tratada_e_registrada_e_exibida_sem_encerrar` |
 | RNF06-CA2 | Automática | `ui/test_error_dialog.py::test_excecao_de_outra_thread_e_exibida_na_thread_principal`<br>`ui/test_error_dialog.py::test_erros_sao_exibidos_um_por_vez`<br>`ui/test_error_dialog.py::test_excecao_nao_tratada_e_registrada_e_exibida_sem_encerrar` |
 | RNF07-CA1 | Automática + Manual | `ui/test_home_view.py::test_segunda_instancia_nao_obtem_a_trava`<br>`ui/test_home_view.py::test_trava_de_processo_encerrado_nao_bloqueia_abertura`<br>Roteiro M2 (mensagem "O HqFriend já está aberto.") |
@@ -523,5 +578,5 @@ graph TD
 | Roteiro | Onde | Passos | Critérios |
 | :--- | :--- | :--- | :--- |
 | **M1** | Código-fonte (`python -m src.main`) ou executável | Com uma raiz já configurada, abrir o aplicativo: a janela abre maximizada na Tela Inicial e carrega as séries da raiz salva. | RF02-CA1, RF02-CA4 |
-| **M2** | Executável `dist\HqFriend\HqFriend.exe` | (1) Abrir o app: sem janela de console, com o ícone e o tema escuro em telas, menus e diálogos; status "Lida" verde, "Em andamento" âmbar, "Não lida" cinza. (2) Ler um `.cbz` e um `.cbr` reais (nenhuma janela de console ao abrir o `.cbr`); usar o botão "Fechar". (3) `Ctrl + P` salva em `Imagens\HQs`. (4) Com o app aberto, abrir uma segunda instância: aviso "O HqFriend já está aberto." e a nova instância encerra. (5) Conferir `Documentos\HqFriend` (`state.json`, `covers\`, `logs\`). (6) Zoom: ampliar com `Ctrl + Scroll`, virar páginas para frente e para trás (o zoom é mantido e a página abre no canto superior esquerdo) e `Ctrl + 0` (volta a ajustar à tela). | RNF01-CA1, RNF01-CA2, RNF04-CA5, RNF07-CA1, RNF08-CA1, RNF08-CA2, RF15-CA2, RF15-CA3, RF15-CA5 |
-| **M3** | Executável, máquina de referência | (1) Virar páginas de HQ com páginas JPEG de ~3 MB em 1920×1080, em CBZ e CBR *solid*: menos de 200 ms por virada, também com zoom de 2x mantido entre as páginas (FEAT-14). (2) Biblioteca com 100+ séries: a interface continua respondendo durante a varredura e a geração de capas. | RNF05-CA1, RNF05-CA2 |
+| **M2** | Executável `dist\HqFriend\HqFriend.exe` | (1) Abrir o app: sem janela de console, com o ícone e o tema escuro em telas, menus e diálogos; status "Lida" verde, "Em andamento" âmbar, "Não lida" cinza. (2) Ler um `.cbz` e um `.cbr` reais (nenhuma janela de console ao abrir o `.cbr`); usar o botão "Fechar". (3) `Ctrl + P` salva em `Imagens\HQs`. (4) Com o app aberto, abrir uma segunda instância: aviso "O HqFriend já está aberto." e a nova instância encerra. (5) Conferir `Documentos\HqFriend` (`state.json`, `covers\`, `logs\`). (6) Zoom: ampliar com `Ctrl + Scroll`, virar páginas para frente e para trás (o zoom é mantido e a página abre no canto superior esquerdo) e `Ctrl + 0` (volta a ajustar à tela). (7) Capas das HQs (FEAT-15): abrir uma série real com `.cbr` e `.cbz` — grade de 5 colunas que acompanha a largura da janela, capas aparecendo uma a uma, sem janela de console; trocar e restaurar a capa de uma HQ pelo botão direito; conferir `Documentos\HqFriend\covers\<Série>\`. | RNF01-CA1, RNF01-CA2, RNF04-CA5, RNF04-CA6, RNF07-CA1, RNF08-CA1, RNF08-CA2, RF05-CA2, RF15-CA2, RF15-CA3, RF15-CA5, RF22-CA1 |
+| **M3** | Executável, máquina de referência | (1) Virar páginas de HQ com páginas JPEG de ~3 MB em 1920×1080, em CBZ e CBR *solid*: menos de 200 ms por virada, também com zoom de 2x mantido entre as páginas (FEAT-14). (2) Biblioteca com 100+ séries: a interface continua respondendo durante a varredura e a geração de capas. (3) Série com 100+ HQs `.cbr` reais, sem capas em cache (FEAT-15): a Tela da Série abre de imediato e continua respondendo (rolagem, menu, "Voltar") durante a geração; registrar o tempo médio por capa na ADR-14. | RNF05-CA1, RNF05-CA2, RNF05-CA4 |

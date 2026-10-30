@@ -5,7 +5,8 @@ import pytest
 from pydantic import ValidationError
 
 from src.domain.enums import SeriesStatus
-from src.domain.models import AppState, ComicDTO, SeriesDTO, SeriesState
+from src.domain.models import (STATE_SCHEMA_VERSION, AppState, ComicDTO, ComicState, SeriesDTO,
+                               SeriesState)
 
 VALID_STATE_JSON = """
 {
@@ -32,11 +33,45 @@ def test_appstate_vazio_gera_json_valido_com_padroes_seguros():
     data = json.loads(AppState().model_dump_json())
 
     assert data == {
-        "version": "1.0",
+        "version": "1.1",
         "root_directory": None,
         "reader_preferences": {"double_page_mode": False},
         "series": {},
     }
+
+
+def test_estado_novo_usa_a_versao_atual_do_schema():
+    # FEAT-15 / RNF02-CA5: o schema passa a 1.1 com o campo custom_cover_page
+    assert STATE_SCHEMA_VERSION == "1.1"
+    assert AppState().version == STATE_SCHEMA_VERSION
+
+
+def test_hq_sem_capa_customizada_por_padrao_e_json_1_0_continua_valido():
+    # FEAT-15 / RF22, RNF02-CA5: HQs de um JSON 1.0 (sem o campo) usam a capa padrão
+    state = AppState.model_validate_json(VALID_STATE_JSON)
+
+    assert ComicState().custom_cover_page is None
+    assert all(comic.custom_cover_page is None
+               for comic in state.series["Batman"].comics.values())
+
+
+def test_pagina_da_capa_da_hq_e_serializada_e_preservada():
+    # FEAT-15 / RF23-CA3: a página escolhida como capa da HQ vai para o state.json
+    state = AppState.model_validate_json(VALID_STATE_JSON)
+    state.series["Batman"].comics["Batman_02.cbr"].custom_cover_page = 4
+
+    data = json.loads(state.model_dump_json())
+    reloaded = AppState.model_validate_json(state.model_dump_json())
+
+    assert data["series"]["Batman"]["comics"]["Batman_02.cbr"]["custom_cover_page"] == 4
+    assert data["series"]["Batman"]["comics"]["Batman_01.cbz"]["custom_cover_page"] is None
+    assert reloaded == state
+
+
+def test_rejeita_pagina_da_capa_da_hq_invalida():
+    with pytest.raises(ValidationError):
+        AppState.model_validate(
+            {"series": {"Batman": {"comics": {"Batman_01.cbz": {"custom_cover_page": "capa"}}}}})
 
 
 def test_appstate_vazio_nao_compartilha_colecoes_entre_instancias():
@@ -101,3 +136,11 @@ def test_hq_em_andamento(is_read, current_page, expected):
                      total_pages=24)
 
     assert comic.is_in_progress is expected
+
+
+def test_hq_dto_sem_capa_por_padrao():
+    # FEAT-15 / RF22-CA1: sem capa em cache, a UI exibe o placeholder
+    comic = ComicDTO(filename="Batman_01.cbz", is_read=False, current_page=0, total_pages=0)
+
+    assert comic.cover_path is None
+    assert comic.has_custom_cover is False

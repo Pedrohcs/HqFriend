@@ -1,4 +1,4 @@
-"""Sincronização disco vs state.json, contadores X/Y, status das séries e marcações (RF04-RF10, RF18)."""
+"""Sincronização disco vs state.json, contadores X/Y, status das séries, marcações e referências de capa (RF04-RF10, RF18, RF22, RF23)."""
 from datetime import datetime
 from pathlib import Path, PureWindowsPath
 from typing import Iterable, List, Optional
@@ -67,15 +67,16 @@ class LibraryService:
         series = self._series_state(series_name)
         comics = tuple(
             ComicDTO(filename=filename, is_read=state.is_read,
-                     current_page=state.current_page, total_pages=state.total_pages)
+                     current_page=state.current_page, total_pages=state.total_pages,
+                     cover_path=self._existing(self.comic_cover_path(series_name, filename)),
+                     has_custom_cover=state.custom_cover_page is not None)
             for filename, state in self._comics_on_disk(series_name))
-        cover_path = self.cover_path(series_name)
         return SeriesDTO(
             name=series_name,
             status=series.status,
             read_count=sum(1 for comic in comics if comic.is_read),
             total_count=len(comics),
-            cover_path=cover_path if cover_path.exists() else None,
+            cover_path=self._existing(self.cover_path(series_name)),
             comics=comics,
             has_custom_cover=series.custom_cover_image is not None,
         )
@@ -104,6 +105,27 @@ class LibraryService:
     def series_without_cover(self) -> List[str]:
         return [name for name in sorted(self._disk, key=natural_sort_key)
                 if not self.cover_path(name).exists()]
+
+    # ---- Capas das HQs (RF22, RF23) ----------------------------------------------------------
+
+    def comic_cover_path(self, series_name: str, comic_filename: str) -> Path:
+        """`covers\\<Série>\\<arquivo>.png`; a extensão da HQ distingue `X.cbz` de `X.cbr`."""
+        return self._covers_dir / series_name / f"{comic_filename}.png"
+
+    def comic_cover_page(self, series_name: str, comic_filename: str) -> Optional[int]:
+        """Página escolhida como capa da HQ (base-0), ou None para a capa padrão."""
+        return self._comic_state(series_name, comic_filename).custom_cover_page
+
+    def set_comic_cover_page(self, series_name: str, comic_filename: str,
+                             page_index: Optional[int]) -> None:
+        """Registra (ou limpa, com None) a capa customizada da HQ e persiste."""
+        self._comic_state(series_name, comic_filename).custom_cover_page = page_index
+        self._repository.save(self._state)
+
+    def comics_without_cover(self, series_name: str) -> List[str]:
+        """HQs da série presentes no disco sem capa em cache, em ordem natural."""
+        return [filename for filename, _ in self._comics_on_disk(series_name)
+                if not self.comic_cover_path(series_name, filename).exists()]
 
     @property
     def double_page_mode(self) -> bool:
@@ -168,6 +190,10 @@ class LibraryService:
         series = self._series_state(series_name)
         return [(filename, series.comics[filename])
                 for filename in sorted(self._disk[series_name], key=natural_sort_key)]
+
+    @staticmethod
+    def _existing(path: Path) -> Optional[Path]:
+        return path if path.exists() else None
 
     def _series_state(self, series_name: str) -> SeriesState:
         if series_name not in self._disk:

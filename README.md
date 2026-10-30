@@ -10,6 +10,7 @@ Funciona **100% offline**: não precisa de internet nem de servidor. O progresso
 
 - **Biblioteca de séries:** cada subpasta da pasta escolhida é uma série, exibida como um card com capa, status (*Não lida*, *Em andamento*, *Lida*) e contador `X / Y obras`.
 - **Capa da série:** por padrão, a primeira página da primeira HQ. Você pode escolher qualquer página de qualquer HQ da série como capa, ou voltar para a padrão.
+- **Tela da Série em grade de capas:** as HQs da série aparecem em uma grade de 5 colunas, cada uma com capa, nome e status. A capa de cada HQ é, por padrão, a primeira página do arquivo; pelo botão direito você escolhe outra página dela ou volta para a padrão. As capas são geradas em segundo plano na primeira vez que a série é aberta e ficam guardadas.
 - **Progresso de leitura:**
   - a leitura retoma da página em que você parou;
   - a HQ é marcada como lida ao chegar à última página;
@@ -99,10 +100,10 @@ graph LR
     B -->|Não| C[Selecionar pasta]
     C --> D
     B -->|Sim| D[Tela Inicial<br/>grid de séries]
-    D -->|Clique no card| E[Tela da Série<br/>lista de HQs]
+    D -->|Clique no card| E[Tela da Série<br/>grade de capas das HQs]
     D -->|Botão direito| F[Capa · Marcar lida/não lida]
     E -->|Duplo clique| G[Leitor]
-    E -->|Botão direito| H[Marcar HQ lida/não lida]
+    E -->|Botão direito| H[Capa da HQ · Marcar lida/não lida]
     G -->|Esc| E
     E -->|Voltar / Esc| D
 ```
@@ -152,9 +153,18 @@ graph TD
 
 ### Seleção de capa
 
+**Da série** (Tela Inicial):
+
 1. Botão direito na série → **Selecionar imagem de capa**.
 2. Escolha a HQ na lista.
 3. Clique na página desejada na galeria de miniaturas → **Definir como capa**.
+
+**De uma HQ** (Tela da Série):
+
+1. Botão direito na HQ → **Selecionar imagem de capa**.
+2. A galeria abre com as páginas daquela HQ e a capa atual selecionada; clique na página desejada → **Definir como capa** (ou dê duplo clique na miniatura).
+
+Nos dois casos, **Restaurar capa padrão** aparece no mesmo menu quando há uma capa escolhida. A capa de uma HQ não muda a capa da série.
 
 ### Atalhos
 
@@ -179,7 +189,8 @@ As pastas são as pastas reais do usuário, inclusive quando redirecionadas para
 | :--- | :--- |
 | `Documentos\HqFriend\state.json` | Pasta configurada, progresso de leitura e preferências |
 | `Documentos\HqFriend\state.json.bak` | Backup da última versão válida |
-| `Documentos\HqFriend\covers\` | Cache das capas das séries |
+| `Documentos\HqFriend\covers\` | Cache das capas das séries (`<Série>.png`) e das HQs (`<Série>\<arquivo>.png`) |
+| `Documentos\HqFriend\state.v1.0.json` | Cópia do `state.json` anterior à atualização do formato (criada uma única vez, ao abrir a v1.2) |
 | `Documentos\HqFriend\logs\hqfriend.log` | Log de erros |
 | `Imagens\HQs\` | Páginas exportadas com `Ctrl + P` |
 

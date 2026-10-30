@@ -30,9 +30,10 @@ class MainWindow(QMainWindow):
         self.home_view = HomeView(library, covers, cover_picker_available=True)
         self.home_view.series_activated.connect(self.show_series)
         self.home_view.cover_selection_requested.connect(self.open_cover_picker)
-        self.series_view = SeriesView(library)
+        self.series_view = SeriesView(library, covers, cover_picker_available=True)
         self.series_view.back_requested.connect(self.show_home)
         self.series_view.comic_open_requested.connect(self.open_comic)
+        self.series_view.comic_cover_selection_requested.connect(self.open_comic_cover_picker)
         self.reader_view = ReaderView(ReaderService(library), exporter or ExportService())
         self.reader_view.close_requested.connect(self.close_reader)
 
@@ -48,6 +49,7 @@ class MainWindow(QMainWindow):
         return self._stack.currentWidget()
 
     def show_home(self) -> None:
+        self.series_view.stop_cover_generation()  # RF22-CA5
         self._stack.setCurrentWidget(self.home_view)
         self.home_view.refresh_library()  # reflete arquivos novos/removidos (RF19)
 
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         except InvalidComicError:
             self.show_invalid_comic(comic_filename)  # permanece na Tela da Série (RF20)
             return
+        self.series_view.stop_cover_generation()  # o leitor não disputa a HQ com as capas (RF22-CA5)
         self.setWindowTitle(f"{comic_filename} — {APP_TITLE}")
         self._stack.setCurrentWidget(self.reader_view)
         self.reader_view.setFocus()
@@ -70,7 +73,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_TITLE)
         self.series_view.refresh()
         self._stack.setCurrentWidget(self.series_view)
-        self.series_view.comic_list.setFocus()
+        self.series_view.start_cover_generation()  # retoma as capas que faltam (RF22-CA5)
+        self.series_view.comic_grid.setFocus()
 
     def show_invalid_comic(self, comic_filename: str) -> None:
         QMessageBox.warning(self, APP_TITLE, INVALID_COMIC_MESSAGE.format(comic=comic_filename))
@@ -85,8 +89,22 @@ class MainWindow(QMainWindow):
         finally:
             dialog.deleteLater()
 
+    def open_comic_cover_picker(self, series_name: str, comic_filename: str) -> None:
+        # A geração das capas fica parada com o diálogo aberto: o worker não regrava a capa
+        # padrão por cima da escolhida (RF23-CA3)
+        self.series_view.stop_cover_generation()
+        dialog = CoverPickerDialog(self._library, self._covers, series_name, self,
+                                   comic_filename=comic_filename)
+        try:
+            if dialog.exec() == QDialog.Accepted:
+                self.series_view.refresh()
+        finally:
+            dialog.deleteLater()
+            self.series_view.start_cover_generation()
+
     def closeEvent(self, event) -> None:
         self.reader_view.close_comic()  # grava o bookmark se o app for fechado durante a leitura
         self.reader_view.shutdown()
+        self.series_view.shutdown()
         self.home_view.shutdown()
         super().closeEvent(event)

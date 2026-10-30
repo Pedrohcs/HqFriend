@@ -219,3 +219,83 @@ def test_marcar_hq_inexistente_lanca_key_error(service):
         service.mark_comic_read("Batman", "Batman 99.cbz")
     with pytest.raises(KeyError):
         service.mark_series_read("Superman")
+
+
+# ---- Capas das HQs (FEAT-15) -------------------------------------------------------------
+
+def _comic(series_dto, filename):
+    return next(comic for comic in series_dto.comics if comic.filename == filename)
+
+
+def test_capa_da_hq_fica_na_pasta_da_serie_com_a_extensao_no_nome(service, covers_dir):
+    # FEAT-15 / RF22-CA2: "X.cbz" e "X.cbr" não colidem
+    service.apply_scan({"Batman": ["Batman 1.cbz", "Batman 1.cbr"]})
+
+    assert service.comic_cover_path("Batman", "Batman 1.cbz") == \
+        covers_dir / "Batman" / "Batman 1.cbz.png"
+    assert service.comic_cover_path("Batman", "Batman 1.cbr") == \
+        covers_dir / "Batman" / "Batman 1.cbr.png"
+
+
+def test_hq_com_capa_em_cache_e_hqs_sem_capa(service, covers_dir):
+    # FEAT-15 / RF22-CA1, RF22-CA3: o DTO aponta para a capa em cache; as demais ficam pendentes
+    service.apply_scan({"Batman": ["Batman 10.cbz", "Batman 2.cbz", "Batman 1.cbz"]})
+    (covers_dir / "Batman").mkdir()
+    (covers_dir / "Batman" / "Batman 2.cbz.png").write_bytes(b"png")
+
+    batman = service.get_series("Batman")
+
+    assert _comic(batman, "Batman 2.cbz").cover_path == covers_dir / "Batman" / "Batman 2.cbz.png"
+    assert _comic(batman, "Batman 1.cbz").cover_path is None
+    assert service.comics_without_cover("Batman") == ["Batman 1.cbz", "Batman 10.cbz"]
+
+
+def test_hqs_fora_do_disco_nao_entram_nas_capas_pendentes(service, repository, covers_dir):
+    # FEAT-15 / RF22: só HQs presentes no disco (ADR-03)
+    service.apply_scan({"Batman": ["Batman 1.cbz", "Batman 2.cbz"]})
+
+    reopened = _reload(repository, covers_dir, {"Batman": ["Batman 2.cbz"]})
+
+    assert reopened.comics_without_cover("Batman") == ["Batman 2.cbz"]
+
+
+def test_capa_customizada_da_hq_e_persistida_e_restaurada(service, repository, covers_dir):
+    # FEAT-15 / RF23-CA3, RF23-CA4: custom_cover_page no state.json
+    service.apply_scan({"Batman": ["Batman 1.cbz", "Batman 2.cbz"]})
+    assert service.comic_cover_page("Batman", "Batman 1.cbz") is None
+
+    service.set_comic_cover_page("Batman", "Batman 1.cbz", 4)
+
+    saved = repository.load().state
+    assert saved.series["Batman"].comics["Batman 1.cbz"].custom_cover_page == 4
+    assert saved.series["Batman"].comics["Batman 2.cbz"].custom_cover_page is None
+    reopened = _reload(repository, covers_dir, {"Batman": ["Batman 1.cbz", "Batman 2.cbz"]})
+    assert reopened.comic_cover_page("Batman", "Batman 1.cbz") == 4
+    assert _comic(reopened.get_series("Batman"), "Batman 1.cbz").has_custom_cover is True
+    assert _comic(reopened.get_series("Batman"), "Batman 2.cbz").has_custom_cover is False
+
+    reopened.set_comic_cover_page("Batman", "Batman 1.cbz", None)
+
+    assert repository.load().state.series["Batman"].comics["Batman 1.cbz"].custom_cover_page is None
+    assert _comic(reopened.get_series("Batman"), "Batman 1.cbz").has_custom_cover is False
+
+
+def test_capa_da_hq_nao_altera_a_referencia_de_capa_da_serie(service):
+    # FEAT-15 / RF23-CA3, QA-12: capas independentes
+    service.apply_scan({"Batman": ["Batman 1.cbz"]})
+
+    service.set_comic_cover_page("Batman", "Batman 1.cbz", 2)
+
+    assert service.cover_source("Batman") is None
+    assert service.get_series("Batman").has_custom_cover is False
+
+
+def test_capa_de_hq_inexistente_lanca_key_error(service):
+    service.apply_scan({"Batman": ["Batman 1.cbz"]})
+
+    with pytest.raises(KeyError):
+        service.set_comic_cover_page("Batman", "Batman 99.cbz", 1)
+    with pytest.raises(KeyError):
+        service.comic_cover_page("Batman", "Batman 99.cbz")
+    with pytest.raises(KeyError):
+        service.comics_without_cover("Superman")

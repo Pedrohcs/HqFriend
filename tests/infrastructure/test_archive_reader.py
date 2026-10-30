@@ -11,7 +11,7 @@ from PIL import Image
 
 from src.domain.errors import InvalidComicError
 from src.infrastructure.archive_reader import (RarArchiveStrategy, ZipArchiveStrategy,
-                                               open_archive)
+                                               open_archive, read_page)
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 EXPECTED_PAGES = ["1.jpg", "2.jpeg", "10.png", "11.webp"]
@@ -133,3 +133,93 @@ def test_leitura_concorrente_entre_threads(filename):
 
     reference = _reference_pages()
     assert pages == [reference[index] for index in indexes]
+
+
+# ---- read_page: leitura de página única para capas (FEAT-15, ADR-14) -------------------------
+
+SUBFOLDER_ARCHIVES = ["subpastas.cbz", "subpastas.cbr"]
+RAR_ARCHIVES = ["rar4.cbr", "rar5.cbr", "rar5_solid.cbr", "rar_renomeado.cbz", "subpastas.cbr"]
+
+
+@pytest.mark.parametrize("filename", [name for name, _ in VALID_ARCHIVES] + SUBFOLDER_ARCHIVES)
+def test_read_page_devolve_os_mesmos_bytes_que_open_archive(filename):
+    # FEAT-15 / RNF04-CA6
+    with open_archive(FIXTURES / filename) as archive:
+        expected = [archive.get_page_bytes(index) for index in range(archive.page_count)]
+
+    assert [read_page(FIXTURES / filename, index) for index in range(len(expected))] == expected
+
+
+@pytest.mark.parametrize("filename", RAR_ARCHIVES)
+def test_read_page_extrai_so_a_entrada_em_um_processo(filename, popen_spy):
+    # FEAT-15 / RNF04-CA6: um processo por página, pedindo só a entrada, sem janela de console
+    with open_archive(FIXTURES / filename) as archive:
+        page_names = archive.list_sorted_pages()
+    popen_spy.clear()
+
+    for index, entry_name in enumerate(page_names):
+        read_page(FIXTURES / filename, index)
+
+        [(args, kwargs)] = popen_spy
+        assert Path(args[0]).name == "UnRAR.exe"
+        assert args[1] == "p" and "-@" in args
+        assert args[-1] == entry_name.replace("/", "\\")
+        assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
+        popen_spy.clear()
+
+
+@pytest.mark.parametrize("filename", SUBFOLDER_ARCHIVES)
+def test_read_page_distingue_paginas_de_mesmo_nome_em_subpastas(filename):
+    # FEAT-15 / RNF04-CA6: "cap1/01.jpg" e "cap2/01.jpg"; "@extra.png" não vira lista de arquivos
+    with zipfile.ZipFile(FIXTURES / "subpastas.cbz") as zf:
+        expected = [zf.read(name) for name in ["@extra.png", "cap1/01.jpg", "cap2/01.jpg"]]
+
+    pages = [read_page(FIXTURES / filename, index) for index in range(3)]
+
+    assert pages == expected
+    assert len(set(pages)) == 3
+
+
+def test_read_page_de_cbz_nao_executa_processos(popen_spy):
+    read_page(FIXTURES / "simples.cbz", 0)
+
+    assert popen_spy == []
+
+
+@pytest.mark.parametrize("filename", INVALID_ARCHIVES)
+def test_read_page_de_arquivo_invalido_lanca_invalid_comic_error(filename):
+    with pytest.raises(InvalidComicError):
+        read_page(FIXTURES / filename, 0)
+
+
+@pytest.mark.parametrize("filename", ["simples.cbz", "rar5.cbr"])
+@pytest.mark.parametrize("index", [-1, 4])
+def test_read_page_com_indice_fora_do_intervalo_lanca_index_error(filename, index):
+    # FEAT-15 / RF23-CA5: o CoverService distingue página inexistente de HQ inválida
+    with pytest.raises(IndexError):
+        read_page(FIXTURES / filename, index)
+
+
+@pytest.mark.parametrize("returncode, stdout", [(0, b"incompleto"), (3, b"")])
+def test_read_page_com_extracao_divergente_lanca_invalid_comic_error(returncode, stdout,
+                                                                      monkeypatch):
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(args, returncode, stdout=stdout, stderr=b"")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(InvalidComicError):
+        read_page(FIXTURES / "rar5.cbr", 0)
+
+
+@pytest.mark.parametrize("filename", ["simples.cbz", "rar5_solid.cbr"])
+def test_read_page_nao_cria_arquivos_temporarios(filename, tmp_path, monkeypatch):
+    temp_dir = tmp_path / "temp"
+    temp_dir.mkdir()
+    monkeypatch.setenv("TEMP", str(temp_dir))
+    monkeypatch.setenv("TMP", str(temp_dir))
+    monkeypatch.setattr(tempfile, "tempdir", str(temp_dir))
+
+    read_page(FIXTURES / filename, 0)
+
+    assert list(temp_dir.iterdir()) == []

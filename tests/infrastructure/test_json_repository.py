@@ -1,11 +1,17 @@
 import os
+from pathlib import Path
 
 import pytest
 
 from src.domain.enums import SeriesStatus
+from src.domain.errors import FutureStateVersionError
 from src.domain.models import AppState, ComicState, SeriesState
 from src.infrastructure import json_repository
 from src.infrastructure.json_repository import JsonStateRepository
+
+# state.json real da v1.1 do aplicativo (schema 1.0)
+STATE_1_0_JSON = (Path(__file__).resolve().parent.parent / "fixtures" / "state_v1_0.json").read_text(
+    encoding="utf-8")
 
 
 @pytest.fixture
@@ -150,3 +156,75 @@ def test_permission_error_persistente_propaga_e_remove_temporario(repository, st
 
     assert sorted(path.name for path in tmp_path.iterdir()) == ["state.json"]
     assert AppState.model_validate_json(state_path.read_bytes()) == AppState()
+
+
+def test_estado_migrado_guarda_copia_do_original(repository, state_path, backup_path, tmp_path):
+    # FEAT-15 / RNF02-CA5
+    state_path.write_text(STATE_1_0_JSON, encoding="utf-8")
+    original = state_path.read_bytes()
+
+    result = repository.load()
+
+    assert result.migrated_from == "1.0"
+    assert result.recovery_warning is None
+    assert result.state.version == "1.1"
+    assert result.state.series["Batman"].comics["Batman_01.cbz"].current_page == 23
+    assert (tmp_path / "state.v1.0.json").read_bytes() == original
+    assert backup_path.read_bytes() == original
+    assert state_path.read_bytes() == original  # regravado só na próxima escrita
+
+    repository.save(result.state)
+
+    assert '"version": "1.1"' in state_path.read_text(encoding="utf-8")
+    reloaded = repository.load()
+    assert reloaded.migrated_from is None
+    assert reloaded.state == result.state
+
+
+def test_copia_do_original_nao_e_sobrescrita(repository, state_path, tmp_path):
+    # FEAT-15 / RNF02-CA5
+    original_copy = tmp_path / "state.v1.0.json"
+    original_copy.write_text("copia anterior", encoding="utf-8")
+    state_path.write_text(STATE_1_0_JSON, encoding="utf-8")
+
+    repository.load()
+
+    assert original_copy.read_text(encoding="utf-8") == "copia anterior"
+
+
+def test_estado_na_versao_atual_nao_gera_copia(repository, state_path, tmp_path):
+    repository.save(_sample_state())
+
+    result = repository.load()
+
+    assert result.migrated_from is None
+    assert list(tmp_path.glob("state.v*.json")) == []
+
+
+def test_backup_1_0_e_migrado_na_recuperacao(repository, state_path, backup_path, tmp_path):
+    # FEAT-15 / RNF02-CA4 + CA5
+    backup_path.write_text(STATE_1_0_JSON, encoding="utf-8")
+    state_path.write_text("corrompido", encoding="utf-8")
+
+    result = repository.load()
+
+    assert result.recovery_warning.restored_from_backup is True
+    assert result.migrated_from == "1.0"
+    assert result.state.version == "1.1"
+    assert (tmp_path / "state.v1.0.json").read_bytes() == backup_path.read_bytes()
+
+
+@pytest.mark.parametrize("version", ["1.2", "2.0"])
+def test_versao_futura_nao_e_sobrescrita_nem_tratada_como_corrompida(
+        repository, state_path, backup_path, tmp_path, version):
+    # FEAT-15 / RNF02-CA6
+    content = f'{{"version": "{version}", "campo_novo": [1, 2, 3]}}'.encode("utf-8")
+    state_path.write_bytes(content)
+
+    with pytest.raises(FutureStateVersionError):
+        repository.load()
+
+    assert state_path.read_bytes() == content
+    assert _corrupt_files(tmp_path) == []
+    assert not backup_path.exists()
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["state.json"]
