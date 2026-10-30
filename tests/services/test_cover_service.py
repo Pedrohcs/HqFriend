@@ -193,3 +193,148 @@ def test_camadas_de_dominio_servicos_e_infraestrutura_nao_importam_pyside6():
                             text=True, check=True).stdout.strip()
 
     assert output == "False"
+
+
+# ---- Capas das HQs (FEAT-15) -------------------------------------------------------------
+
+def _ensure_comic_covers(covers, series_name="Batman"):
+    return {job.comic_filename: covers.ensure_comic_cover(job)
+            for job in covers.comic_cover_jobs(series_name)}
+
+
+def test_capa_da_hq_e_a_primeira_pagina_em_ordem_natural(covers, library, covers_dir):
+    # FEAT-15 / RF22-CA2: "1.jpg" (vermelha) vem antes de "10.png" (azul, 1ª na ordem física)
+    jobs = covers.comic_cover_jobs("Batman")
+
+    assert [(job.comic_filename, job.page_index) for job in jobs] == \
+        [("Batman 1.cbz", 0), ("Batman 2.cbr", 0)]
+    result = _ensure_comic_covers(covers)
+
+    assert result == {"Batman 1.cbz": covers_dir / "Batman" / "Batman 1.cbz.png",
+                      "Batman 2.cbr": covers_dir / "Batman" / "Batman 2.cbr.png"}
+    assert all(_close_to(_color_of(path), RED) for path in result.values())
+    assert covers.comic_cover_jobs("Batman") == []
+    assert [comic.cover_path for comic in library.get_series("Batman").comics] == \
+        list(result.values())
+
+
+def test_capa_da_hq_e_reduzida_e_gravada_em_covers_da_serie(covers, library, root, covers_dir):
+    # FEAT-15 / RF22-CA2: no máximo 400 px de largura, gravação atômica
+    (root / "Grande").mkdir()
+    _write_large_comic(root / "Grande" / "Grande 1.cbz")
+    library.apply_scan({"Grande": ["Grande 1.cbz"]})
+
+    [path] = _ensure_comic_covers(covers, "Grande").values()
+
+    assert path == covers_dir / "Grande" / "Grande 1.cbz.png"
+    assert Image.open(path).size == (400, 600)
+    assert sorted(item.name for item in (covers_dir / "Grande").iterdir()) == ["Grande 1.cbz.png"]
+
+
+def test_capa_da_hq_em_cache_nao_reabre_o_arquivo(covers, library, covers_dir, monkeypatch):
+    # FEAT-15 / RF22-CA3
+    [job, _] = covers.comic_cover_jobs("Batman")
+    job.cover_path.parent.mkdir(parents=True)
+    job.cover_path.write_bytes(b"capa existente")
+
+    def fail(*args, **kwargs):
+        raise AssertionError("a HQ não deve ser aberta")
+
+    monkeypatch.setattr("src.services.cover_service.read_page", fail)
+    monkeypatch.setattr("src.services.cover_service.open_archive", fail)
+
+    assert covers.ensure_comic_cover(job) == job.cover_path
+    assert job.cover_path.read_bytes() == b"capa existente"
+    assert [pending.comic_filename for pending in covers.comic_cover_jobs("Batman")] == \
+        ["Batman 2.cbr"]
+
+
+def test_hq_invalida_fica_sem_capa_e_nao_impede_as_demais(covers, library, root, covers_dir,
+                                                         caplog):
+    # FEAT-15 / RF22-CA4: HQ corrompida e HQ com a 1ª página ilegível
+    shutil.copy(FIXTURES / "corrompido.cbr", root / "Batman" / "Batman 0.cbr")
+    with zipfile.ZipFile(root / "Batman" / "Batman 3.cbz", "w") as zf:
+        zf.writestr("1.jpg", b"isto nao e uma imagem")
+    library.apply_scan({"Batman": ["Batman 0.cbr", "Batman 1.cbz", "Batman 2.cbr",
+                                   "Batman 3.cbz"]})
+
+    result = _ensure_comic_covers(covers)
+
+    assert result["Batman 0.cbr"] is None and result["Batman 3.cbz"] is None
+    assert _close_to(_color_of(result["Batman 1.cbz"]), RED)
+    assert _close_to(_color_of(result["Batman 2.cbr"]), RED)
+    assert sum("Capa da HQ indisponível" in record.message for record in caplog.records) == 2
+    assert not list((covers_dir / "Batman").glob("*.tmp"))
+
+
+def test_capa_customizada_da_hq_atualiza_cache_e_estado(covers, library, repository, covers_dir):
+    # FEAT-15 / RF23-CA3
+    _ensure_comic_covers(covers)
+
+    path = covers.set_comic_cover("Batman", "Batman 2.cbr", 2)
+
+    assert path == covers_dir / "Batman" / "Batman 2.cbr.png"
+    assert _close_to(_color_of(path), BLUE)
+    saved = repository.load().state.series["Batman"].comics
+    assert saved["Batman 2.cbr"].custom_cover_page == 2
+    assert saved["Batman 1.cbz"].custom_cover_page is None
+    comics = {comic.filename: comic for comic in library.get_series("Batman").comics}
+    assert comics["Batman 2.cbr"].has_custom_cover is True
+    assert comics["Batman 1.cbz"].has_custom_cover is False
+
+
+def test_capa_da_hq_nao_altera_capa_da_serie(covers, library, covers_dir):
+    # FEAT-15 / RF23-CA3, QA-12
+    _ensure_all(covers)
+    series_cover = (covers_dir / "Batman.png").read_bytes()
+
+    covers.set_comic_cover("Batman", "Batman 1.cbz", 2)
+
+    assert (covers_dir / "Batman.png").read_bytes() == series_cover
+    assert library.cover_source("Batman") is None
+    assert library.get_series("Batman").has_custom_cover is False
+
+
+def test_restaurar_capa_padrao_da_hq(covers, library, repository):
+    # FEAT-15 / RF23-CA4
+    covers.set_comic_cover("Batman", "Batman 2.cbr", 2)
+
+    path = covers.restore_comic_cover("Batman", "Batman 2.cbr")
+
+    assert _close_to(_color_of(path), RED)
+    assert repository.load().state.series["Batman"].comics["Batman 2.cbr"].custom_cover_page is None
+    assert library.comic_cover_page("Batman", "Batman 2.cbr") is None
+
+
+def test_capa_customizada_apagada_e_regerada_da_pagina_registrada(covers, library):
+    # FEAT-15 / RF23-CA5 (caso normal): o cache sumiu, a página registrada ainda existe
+    path = covers.set_comic_cover("Batman", "Batman 1.cbz", 2)
+    path.unlink()
+
+    [job] = covers.comic_cover_jobs("Batman")[:1]
+
+    assert (job.comic_filename, job.page_index) == ("Batman 1.cbz", 2)
+    assert _close_to(_color_of(covers.ensure_comic_cover(job)), BLUE)
+
+
+def test_pagina_customizada_inexistente_usa_capa_padrao(covers, library, repository, caplog):
+    # FEAT-15 / RF23-CA5: HQ substituída por versão menor e cache apagado
+    library.set_comic_cover_page("Batman", "Batman 2.cbr", 99)
+
+    result = _ensure_comic_covers(covers)
+
+    assert _close_to(_color_of(result["Batman 2.cbr"]), RED)
+    assert repository.load().state.series["Batman"].comics["Batman 2.cbr"].custom_cover_page == 99
+    assert any("Página 99 inexistente" in record.message for record in caplog.records)
+
+
+def test_capas_das_series_usam_leitura_de_pagina_unica(covers, covers_dir, root, monkeypatch):
+    # FEAT-15 / ADR-14: a capa da série não abre mais a HQ inteira
+    def fail(*args, **kwargs):
+        raise AssertionError("open_archive não deve ser usado para gerar capas")
+
+    monkeypatch.setattr("src.services.cover_service.open_archive", fail)
+
+    assert covers.ensure_default_cover("Batman", [root / "Batman" / "Batman 2.cbr"]) == \
+        covers_dir / "Batman.png"
+    assert _close_to(_color_of(covers.set_custom_cover("Batman", "Batman 2.cbr", 1)), GREEN)

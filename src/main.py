@@ -1,4 +1,5 @@
 """Entrypoint do HqFriend: logs, instância única, bootstrap de pastas e QApplication."""
+import logging
 import sys
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from src import config
-from src.domain.errors import StateRecoveredWarning
+from src.domain.errors import FutureStateVersionError, StateRecoveredWarning
 from src.infrastructure import logging_setup
 from src.infrastructure.fs_scanner import ensure_system_directories
 from src.infrastructure.json_repository import JsonStateRepository
@@ -24,6 +25,8 @@ from src.ui.main_window import MainWindow
 
 STYLESHEET_PATH = config.get_resource_path("assets/styles/dark_theme.qss")
 ICON_PATH = config.get_resource_path("assets/icon.ico")
+
+logger = logging.getLogger(__name__)
 
 
 def acquire_instance_lock(lock_path: Path) -> Optional[QLockFile]:
@@ -42,6 +45,12 @@ def recovery_message(warning: StateRecoveredWarning) -> str:
                 "Alterações feitas após a última abertura podem ter sido perdidas.")
     return ("O arquivo de estado estava corrompido e não pôde ser restaurado.\n"
             "O HqFriend foi iniciado com uma biblioteca limpa.")
+
+
+def future_version_message(error: FutureStateVersionError) -> str:
+    return ("O arquivo de estado é de uma versão mais nova do HqFriend.\n"
+            "Atualize o aplicativo para continuar.\n\n"
+            f"Versão do arquivo: {error.found} · versão suportada: {error.supported}")
 
 
 def main() -> int:
@@ -64,7 +73,14 @@ def main() -> int:
     app.setStyleSheet(STYLESHEET_PATH.read_text(encoding="utf-8"))
     library = LibraryService(JsonStateRepository())
     covers = CoverService(library)
-    recovery_warning = library.load_state()
+    try:
+        recovery_warning = library.load_state()
+    except FutureStateVersionError as error:
+        # O state.json não é sobrescrito: encerrar antes de qualquer gravação (RNF02-CA6)
+        logger.error("Encerrando: %s", error)
+        QMessageBox.critical(None, "HqFriend", future_version_message(error))
+        lock.unlock()
+        return 1
 
     window = MainWindow(library, covers)
     window.showMaximized()

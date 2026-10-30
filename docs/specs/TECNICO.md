@@ -59,22 +59,23 @@ hqfriend/
 │   ├── domain/                          # [Camada 2 - Domínio] Modelos e Schemas Pydantic
 │   │   ├── __init__.py
 │   │   ├── enums.py                     # SeriesStatus (UNREAD, IN_PROGRESS, READ)
-│   │   ├── errors.py                    # InvalidComicError, StateRecoveredWarning
+│   │   ├── errors.py                    # InvalidComicError, StateRecoveredWarning, FutureStateVersionError
 │   │   ├── sorting.py                   # natural_sort_key (páginas, séries e HQs)
 │   │   └── models.py                    # Schemas Pydantic (ComicState, SeriesState, AppState) e DTOs
 │   │
 │   ├── infrastructure/                  # [Camada 3 - Infraestrutura & Dados]
 │   │   ├── __init__.py
-│   │   ├── json_repository.py           # Escrita atômica, backup .bak e recuperação do state.json
+│   │   ├── json_repository.py           # Escrita atômica, backup .bak, recuperação e migração do state.json
+│   │   ├── state_migrations.py          # Migrações dict -> dict encadeadas por versão do schema (FEAT-15)
 │   │   ├── fs_scanner.py                # Criação de diretórios e escaneamento de nível único (.cbr/.cbz)
-│   │   ├── archive_reader.py            # ZipArchiveStrategy, RarArchiveStrategy (passada única), Magic Bytes
+│   │   ├── archive_reader.py            # ZipArchiveStrategy, RarArchiveStrategy (passada única), Magic Bytes, read_page
 │   │   └── logging_setup.py             # RotatingFileHandler + sys/threading excepthook
 │   │
 │   ├── services/                        # [Camada 2 - Aplicação] Regras de Negócio (sem PySide6)
 │   │   ├── __init__.py
 │   │   ├── library_service.py           # Sincronização disco vs JSON, cálculo X/Y, status e marcações
 │   │   ├── reader_service.py            # Sessão de leitura, pareamento duplo, bookmark e gatilho de lido
-│   │   ├── cover_service.py             # Capa padrão, capa customizada, restauração e thumbnails
+│   │   ├── cover_service.py             # Capas de séries e HQs (padrão, customizada, restauração) e thumbnails
 │   │   └── export_service.py            # União centralizada em fundo preto e salvamento PNG (Ctrl+P)
 │   │
 │   └── ui/                              # [Camada 1 - Apresentação] PySide6 Views & Widgets
@@ -83,13 +84,14 @@ hqfriend/
 │       ├── error_dialog.py              # Exibição de exceções não tratadas de qualquer thread (RNF06)
 │       ├── views/
 │       │   ├── home_view.py             # Grid de cards de Séries + Menu de Contexto + F5/Atualizar
-│       │   ├── series_view.py           # Lista de HQs da Série + Duplo Clique + Menu de Contexto
+│       │   ├── series_view.py           # Grade de capas das HQs (5 colunas) + Duplo Clique + Menu de Contexto
 │       │   └── reader_view.py           # QGraphicsView customizado (Zoom, Pan, Atalhos Teclado)
 │       ├── dialogs/
-│       │   └── cover_picker_dialog.py   # Modal em 2 etapas: ComboBox de HQ -> Grid de Thumbnails
+│       │   └── cover_picker_dialog.py   # Modal em 2 etapas: ComboBox de HQ -> Grid de Thumbnails (ou modo HQ)
 │       └── workers/
 │           ├── library_scan_worker.py   # QThread: varredura do disco fora da thread principal
-│           ├── cover_worker.py          # QThread: geração progressiva de capas padrão
+│           ├── cover_worker.py          # QThread: geração progressiva de capas padrão das séries
+│           ├── comic_cover_worker.py    # QThread: geração progressiva das capas das HQs da série aberta (FEAT-15)
 │           ├── thumbnail_worker.py      # QThread: extração assíncrona de páginas para o CoverPicker
 │           └── export_worker.py         # QThread: gravação do PNG do Ctrl + P
 │
@@ -136,9 +138,10 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
 
 > **Decisão QA-01 (`REQUISITOS.md`, opção C):** o modelo mantém o estado único chaveado por nome de série/arquivo. Trocar `root_directory` apenas atualiza esse campo; `series` não é limpo nem reorganizado.
 
-* **Schemas** (`src/domain/models.py`): `AppState` → `ReaderPreferences`, `series: Dict[str, SeriesState]` → `comics: Dict[str, ComicState]` e `CoverSource`. O contrato de campos, tipos e exemplo está em `ARQUITETURA.md` §3.2; a política de versão e migração, em §3.3.
+* **Schemas** (`src/domain/models.py`): `AppState` → `ReaderPreferences`, `series: Dict[str, SeriesState]` → `comics: Dict[str, ComicState]` e `CoverSource`. `ComicState.custom_cover_page: Optional[int]` *(FEAT-15)* guarda a página da capa da HQ. O contrato de campos, tipos e exemplo está em `ARQUITETURA.md` §3.2; a política de versão e migração, em §3.3.
+* **Versão do schema:** `STATE_SCHEMA_VERSION = "1.1"` *(FEAT-15)*, valor padrão de `AppState.version`.
 * **Enum** `SeriesStatus` (`src/domain/enums.py`): `UNREAD`, `IN_PROGRESS`, `READ`.
-* **DTOs para a UI** (`dataclass(frozen=True)`): `SeriesDTO` (inclui `counter_label` no formato `X / Y obras` e `has_custom_cover`) e `ComicDTO` (inclui `is_in_progress`).
+* **DTOs para a UI** (`dataclass(frozen=True)`): `SeriesDTO` (inclui `counter_label` no formato `X / Y obras` e `has_custom_cover`) e `ComicDTO` (inclui `is_in_progress` e, desde a FEAT-15, `cover_path` — `None` sem capa em cache — e `has_custom_cover`).
 * Toda mudança nesses schemas é uma mudança de contrato e segue `ARQUITETURA.md` §3.3.
 
 **Escrita Atômica (`JsonStateRepository.save`):**
@@ -155,6 +158,13 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
 3. Em caso de falha (`ValueError` / `ValidationError`): renomeia o arquivo para `state.corrupt-<AAAAMMDD-HHMMSS>.json`, registra em log e tenta carregar `state.json.bak`.
 4. Se o backup também falhar ou não existir: retorna `AppState()` limpo.
 5. Nos casos 3 e 4, o repositório sinaliza `StateRecoveredWarning` para que a UI avise o usuário (*"O arquivo de estado estava corrompido e foi restaurado do backup"* / *"...e não pôde ser restaurado"*).
+
+**Migração de Schema (FEAT-15 — `src/infrastructure/state_migrations.py`, RNF02-CA5/CA6):**
+1. O passo 2 acima passa a ser: `json.loads` do arquivo → leitura de `version` (ausente = `"1.0"`) → verificação de versão futura → migrações → `AppState.model_validate`. JSON malformado, conteúdo que não é objeto, `version` que não é texto `maior.menor` ou versão antiga sem migração registrada são tratados como arquivo corrompido (passo 3). O mesmo caminho vale para o `state.json.bak` na recuperação.
+2. **Versão futura:** as versões são comparadas como tupla numérica `(maior, menor)`. Acima de `STATE_SCHEMA_VERSION`, `load()` lança `FutureStateVersionError(found, supported)` **antes** de qualquer escrita: o arquivo não é renomeado, não é copiado para o `.bak` e não é regravado. `main.py` registra o erro em log, exibe um `QMessageBox.critical` com *"O arquivo de estado é de uma versão mais nova do HqFriend. Atualize o aplicativo para continuar."* seguido das versões do arquivo e suportada (`future_version_message`), libera a trava de instância única e retorna código de saída `1`, sem criar a `MainWindow`.
+3. **Migrações:** `MIGRATIONS: dict[str, Callable[[dict], dict]]` mapeia a versão de origem para uma função pura que devolve o `dict` na versão seguinte (`"1.0"` → `_1_0_to_1_1`, que só troca `version` para `"1.1"`). `migrate(data)` aplica as funções em cadeia até a versão atual e devolve também a versão original.
+4. **Cópia do original:** se houve migração, o arquivo lido é copiado para `state.v<versão-original>.json` (ex: `state.v1.0.json`) **antes** de qualquer gravação, sem sobrescrever uma cópia existente. O `.bak` continua sendo a cópia do arquivo carregado.
+5. O estado migrado é gravado na próxima escrita normal (a varredura da inicialização já grava).
 
 ---
 
@@ -178,6 +188,15 @@ O uso do **Pydantic v2** garante que o arquivo `state.json` nunca seja salvo com
     * *Arquivo protegido por senha:* com `-p-`, o `UnRAR.exe` retorna imediatamente com código `11` (senha incorreta) sem aguardar entrada, o que resulta em `InvalidComicError`. Com cabeçalhos criptografados, a listagem do `rarfile` pode retornar sem entradas, também resultando em `InvalidComicError` (sem imagens).
     * *Teste obrigatório:* fixtures com RAR4, RAR5 e RAR *solid*, validando que os bytes fatiados correspondem aos de `rf.read(entry)`.
 * **Arquivo Inválido (RF20):** arquivos que não sejam ZIP/RAR válidos, protegidos por senha, corrompidos ou sem nenhuma imagem após o filtro lançam `InvalidComicError` (definida em `src/domain/errors.py`).
+* **Leitura de Página Única — `read_page(path, page_index)` (FEAT-15, ADR-14, RNF04-CA6):** caminho usado pelo `CoverService` para gerar capas (séries e HQs). O leitor e o seletor de capa continuam em `open_archive()`.
+    1. Detecta o formato pelos *Magic Bytes*, como `open_archive()`.
+    2. Lista as entradas e aplica **o mesmo** filtro de imagens e a mesma ordenação natural, para que o índice `n` aponte para a mesma página nos dois caminhos (listagem compartilhada: `_list_zip` / `_list_rar`). Nenhuma imagem → `InvalidComicError`; índice fora do intervalo → `IndexError`, como em `get_page_bytes()`, para o `CoverService` distinguir página inexistente de HQ inválida (RF23-CA5).
+    3. **ZIP:** lê só a entrada da página com `zipfile` e fecha o arquivo.
+    4. **RAR:** rejeita a entrada protegida por senha e executa `UnRAR.exe p -inul -p- -@ -- <arquivo> <entrada>` com `creationflags=subprocess.CREATE_NO_WINDOW`. O `stdout` precisa ter exatamente o `file_size` da entrada e o código de saída precisa ser `0`; caso contrário, `InvalidComicError`.
+        * O nome da entrada é passado com `\` como separador: o `rarfile` devolve `cap1/01.jpg`, mas o `UnRAR.exe` só casa `cap1\01.jpg`. Um nome sem pasta casa apenas a entrada da raiz, então `cap1\01.jpg` e `cap2\01.jpg` não se confundem.
+        * `-@` desliga as listas de arquivos: sem ele, uma entrada como `@extra.png` seria lida como o nome de um arquivo-lista, e nada seria extraído.
+        * Nomes que o `UnRAR.exe` trate como máscara (`*`, `?`, possíveis só em arquivos criados fora do Windows) extraem mais de uma entrada; a verificação de tamanho transforma isso em `InvalidComicError` (capa indisponível), nunca em uma página errada.
+    * *Testes:* bytes idênticos aos de `open_archive().get_page_bytes()` em todas as páginas de ZIP, RAR4, RAR5, RAR5 *solid*, formatos trocados e da fixture `subpastas` (mesmo nome em subpastas + nome iniciado por `@`); um único `subprocess.run` por chamada, com o nome da entrada e `CREATE_NO_WINDOW`; extração divergente → `InvalidComicError`.
 
 ---
 
@@ -282,10 +301,17 @@ Atende integralmente ao **RF17** e às validações técnicas de sanitização, 
 ---
 
 ### 3.7. Capas e Miniaturas (`src/services/cover_service.py`)
+* **Leitura da página:** toda capa (padrão ou customizada, de série ou de HQ) é obtida com `archive_reader.read_page()` *(FEAT-15, ADR-14)*, sem abrir a HQ inteira.
 * **Capa padrão:** página 0 da primeira HQ válida da série, em ordem natural (HQs inválidas são puladas e registradas em log); sem nenhuma HQ válida, a série fica sem capa e o card exibe *placeholder* (RF11-CA2). Gerada pelo `CoverWorker` só para séries sem arquivo em `covers\`.
 * **Arquivo de capa:** `%DOCUMENTOS%\HqFriend\covers\{Serie}.png`, reduzido para no máximo **400 px** de largura (`COVER_MAX_WIDTH`), mantendo a proporção e sem ampliar; PNG otimizado, com gravação atômica (`.png.tmp` → `os.replace`).
 * **Capa customizada:** `set_custom_cover()` regrava o arquivo a partir da página escolhida (em resolução original antes da redução) e registra `custom_cover_image` / `cover_source` via `LibraryService.set_cover_reference()`. `restore_default_cover()` apaga o arquivo, limpa a referência e regera a capa padrão.
 * **Miniaturas do seletor:** `iter_thumbnails(comic_path)` abre a HQ **uma única vez** e produz `(índice, miniatura)` com **250 px** de largura (`THUMBNAIL_WIDTH`); páginas ilegíveis são puladas e registradas em log. Fechar o gerador libera o arquivo (ADR-13). No diálogo, as miniaturas são exibidas em ícones de 150×225.
+* **Capas das HQs (FEAT-15 — RF22, RF23):**
+    * **Arquivo:** `covers\<Série>\<arquivo>.png` — `LibraryService.comic_cover_path()`; o nome do arquivo da HQ é mantido com a extensão (`Batman_01.cbz.png`), o que distingue `X.cbz` de `X.cbr`. Mesmas regras de redução (400 px, `COVER_MAX_WIDTH`) e de gravação atômica da capa da série; a subpasta da série é criada sob demanda.
+    * **Jobs:** `comic_cover_jobs(series)` roda na thread principal e devolve um `ComicCoverJob` (arquivo, caminho da HQ, caminho da capa, página = `custom_cover_page` ou `0`) para cada HQ presente no disco sem arquivo de capa, em ordem natural. `ensure_comic_cover(job)` roda no `ComicCoverWorker`, não acessa o estado e devolve o caminho ou `None`.
+    * **Falhas:** `InvalidComicError`, `OSError` (inclusive caminho longo demais) ou `ValueError` → log de aviso e `None` (*placeholder* "Sem capa" — RF22-CA4). Página customizada fora do intervalo → nova tentativa com a página 0 e log (RF23-CA5); o `custom_cover_page` não é alterado.
+    * **Customizar e restaurar:** `set_comic_cover(series, comic, page)` regrava o arquivo a partir da página escolhida e chama `LibraryService.set_comic_cover_page()` (persiste). `restore_comic_cover(series, comic)` apaga o arquivo, limpa a referência e regera a capa a partir da página 0. Nenhuma das duas toca na capa da série (QA-12).
+    * **Órfãs:** capas de HQs que saíram do disco ficam em `covers\<Série>\` (ADR-03).
 
 ---
 
@@ -300,7 +326,7 @@ Atende integralmente ao **RF17** e às validações técnicas de sanitização, 
 
 A `MainWindow` inicia maximizada em **Dark Mode** (`#121212` — RNF08) e contém um `QStackedWidget` com 3 índices:
 * `Index 0` $\rightarrow$ `HomeView` (Sempre exibida ao iniciar o aplicativo — **RF02**).
-* `Index 1` $\rightarrow$ `SeriesView` (Exibida ao clicar em um card de série na `HomeView`; ao voltar para a `HomeView`, dispara nova sincronização — **RF19**).
+* `Index 1` $\rightarrow$ `SeriesView` (Exibida ao clicar em um card de série na `HomeView`, com a grade de capas das HQs — **RF05**, §4.4; ao voltar para a `HomeView`, interrompe a geração de capas das HQs e dispara nova sincronização — **RF19**, **RF22-CA5**).
 * `Index 2` $\rightarrow$ `ReaderView` (Exibida ao dar duplo clique em uma HQ válida na `SeriesView`, com o título da janela `<arquivo> — HqFriend`; ao pressionar `ESC` ou o botão "Fechar", grava o bookmark pendente, restaura o título `HqFriend` e retorna imediatamente para o `Index 1` atualizando os contadores e badges).
 
 ### 4.2. Canvas de Leitura, Zoom, Pan e Ajuste à Tela (`ReaderView`)
@@ -331,8 +357,10 @@ Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fund
 | **`HomeView`** | `F5` ou botão **"Atualizar"** | Dispara `LibraryScanWorker` para reescanear o diretório raiz (RF19). |
 | **`CoverPickerDialog`** | Seleção no `QComboBox` (Passo 1) | Interrompe o worker anterior (se houver) e dispara `ThumbnailWorker` em background extraindo as páginas apenas da HQ escolhida (250px de largura), populando o `QListWidget` em modo `IconMode`. |
 | **`CoverPickerDialog`** | Clique na Página + Confirmar, ou duplo clique na miniatura (Passo 2) | Salva a página escolhida em `%DOCUMENTOS%\HqFriend\covers\{Serie}.png` e atualiza o card na `HomeView`. O botão "Definir como capa" só fica habilitado com uma página selecionada (RF12-CA4). |
-| **`SeriesView`** | Duplo Clique na HQ (`itemDoubleClicked`) | Abre `ReaderView` na HQ selecionada (retomando do Bookmark se a HQ não estiver lida). Se o arquivo for inválido, exibe `QMessageBox` de erro e permanece na tela (RF20). |
-| **`SeriesView`** | Clique Direito na HQ | Abre `QMenu` com **"Marcar como lida"** (ou **"Marcar como não lida"** se já estiver lida — zera o bookmark). |
+| **`SeriesView`** | Duplo Clique no card da HQ (`itemDoubleClicked`) | Interrompe a geração de capas, abre `ReaderView` na HQ selecionada (retomando do Bookmark se a HQ não estiver lida). Se o arquivo for inválido, exibe `QMessageBox` de erro e permanece na tela (RF20). |
+| **`SeriesView`** | Clique Direito no card da HQ | Abre `QMenu` com **1. "Selecionar imagem de capa"**, **2. "Restaurar capa padrão"** (somente se a HQ tiver capa customizada), separador e **3. "Marcar como lida"** (ou **"Marcar como não lida"** se já estiver lida — zera o bookmark) (RF08, RF23-CA1). |
+| **`SeriesView`** | Setas do teclado | Movem a seleção entre os cards da grade (comportamento nativo do `QListWidget`). |
+| **`CoverPickerDialog`** (modo HQ) | Clique na Página + Confirmar, ou duplo clique na miniatura | Salva a página em `covers\<Série>\<arquivo>.png`, registra `custom_cover_page` e atualiza o card da HQ na `SeriesView` (RF23-CA3). |
 | **`ReaderView`** | `Right` (Seta Direita) ou `Space` | Avança página/par mantendo o zoom (com zoom > 1x, a página abre no canto superior esquerdo), agenda a gravação do bookmark (*debounce*) e verifica conclusão. |
 | **`ReaderView`** | `Left` (Seta Esquerda) | Volta página/par mantendo o zoom (com zoom > 1x, a página abre no canto superior esquerdo) e agenda a gravação do bookmark (*debounce*). |
 | **`ReaderView`** | `Ctrl + S` | Alterna `double_page_mode` (pareamento a partir da pág 1, preferência persistida), re-renderiza, reseta o zoom, agenda a gravação do bookmark e verifica conclusão. |
@@ -340,7 +368,17 @@ Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fund
 | **`ReaderView`** | `Ctrl + Scroll do Mouse` | Aplica Zoom In / Zoom Out ancorado no cursor; o zoom é mantido ao virar a página. |
 | **`ReaderView`** | `Ctrl + 0` | Restaura o ajuste à tela (*Fit-to-View*, zoom 1x) — `reset_zoom_fit_to_view()`. |
 | **`ReaderView`** | Arrastar com Botão Esquerdo | Move a página ampliada pelo canvas (*Pan*). |
-| **`ReaderView`** | `ESC` ou clique no botão "Fechar" (`✕`) | Grava o bookmark pendente, fecha a leitura da HQ, libera o arquivo `.cbr`/`.cbz` da memória e volta para `SeriesView`. |
+| **`ReaderView`** | `ESC` ou clique no botão "Fechar" (`✕`) | Grava o bookmark pendente, fecha a leitura da HQ, libera o arquivo `.cbr`/`.cbz` da memória e volta para `SeriesView` (que retoma a geração das capas que faltam). |
+
+### 4.4. Grade de Capas da Tela da Série (`SeriesView` — FEAT-15, RF05, RF22, RF23)
+* **Widget:** `QListWidget` (`objectName="comicGrid"`) em `IconMode`, `Movement.Static`, `ResizeMode.Adjust`, seleção única, `setUniformItemSizes(True)`, rolagem vertical por pixel e barra horizontal sempre desligada. Cada item guarda o nome do arquivo (`Qt.UserRole`), o texto e a chave do status, a capa (`QPixmap` ou `None`) e o texto do *placeholder*; o *tooltip* é o nome completo (RF05-CA1). O `QListWidget` desenha só os itens visíveis. Estilo em `dark_theme.qss` (`QListWidget#comicGrid`: fundo `#121212`, sem borda).
+* **Card (`ComicCardDelegate`, `QStyledItemDelegate`):** fundo `#1e1e1e` (`#2a2a2a` sob o cursor) com cantos arredondados, borda âmbar `#e5a00d` no card selecionado; capa 2:3 sobre fundo preto, desenhada com `Qt.KeepAspectRatio` e transformação suave; nome em uma linha com `QFontMetrics.elidedText(..., Qt.ElideRight)` e status em outra, nas cores de `STATUS_COLORS` (RNF08-CA2). Sem capa, desenha o texto do *placeholder* ("Carregando capa…" ou "Sem capa") no centro da área da capa.
+* **5 colunas fixas (RF05-CA2, QA-11):** a cada `Resize` do `comicGrid` (via *event filter*), a largura da célula é `max(COMIC_CARD_MIN_WIDTH, disponível // 5)`, com `COMIC_CARD_MIN_WIDTH = 120` px, onde "disponível" é a largura do widget menos a moldura e a largura da barra de rolagem vertical — descontada **sempre**, para o tamanho dos cards não oscilar quando a barra aparece ou some. A altura da célula soma margens, a capa (largura útil × 1,5) e as duas linhas de texto; o `gridSize` só é reatribuído quando muda. O `comicGrid` tem largura mínima de 5 células de 120 px: a Tela da Série não encolhe abaixo disso (com a janela mínima de 800 px da `MainWindow`, esse limite não é atingido).
+* **Capas em memória:** o `QPixmap` original do cache (até 400 px) é guardado por `(caminho, data de modificação)` — uma capa regravada é relida do disco — e redimensionado na pintura. O cache é limpo ao abrir outra série.
+* **Atualização no lugar:** `refresh()` só recria os itens se a lista de arquivos mudou; caso contrário atualiza status e capa dos itens existentes, preservando seleção e posição da rolagem.
+* **Geração (RF22-CA1/CA5):** `load_series()` e o retorno do leitor (`MainWindow.close_reader()`) chamam `start_cover_generation()`, que monta os *jobs* com `CoverService.comic_cover_jobs()`, marca essas HQs como "Carregando capa…" e inicia o `ComicCoverWorker`. `stop_cover_generation()` chama `requestInterruption()` sem `wait()` e é chamada pela `MainWindow` ao voltar para a Home e ao abrir uma HQ. Um pedido de geração com um worker ainda ativo fica pendente e é atendido quando ele termina (mesmo padrão da `HomeView`); trocar de série interrompe o worker anterior e ignora os sinais dele (`comic_cover_ready` leva o nome da série). O sinal `covers_loaded` é emitido quando não há mais geração em andamento. `shutdown()` interrompe e aguarda (`wait()`), e é chamada no `closeEvent` da `MainWindow`.
+* **Menu da HQ (RF08, RF23-CA1):** "Selecionar imagem de capa" emite `comic_cover_selection_requested(série, arquivo)` e só fica habilitada com `cover_picker_available=True` (mesmo padrão da `HomeView`). A `MainWindow` liga o sinal a `open_comic_cover_picker()`, que **para a geração das capas**, abre o `CoverPickerDialog` em modo HQ (`comic_filename=...`, argumento só por nome — o 4º posicional continua sendo o `parent`), atualiza a grade se a capa foi confirmada e **retoma a geração** ao fechar; "Restaurar capa padrão" (só com capa customizada) chama `CoverService.restore_comic_cover()` e atualiza a grade.
+* **Preservado da v1.1:** `selected_comic()`, `comic_rows()`, `build_comic_menu()`, `mark_comic_read/unread()`, `comic_open_requested` e o atalho `Esc`. O texto de ajuda passa a ser "Duplo clique para ler · Botão direito para marcar como lida/não lida ou trocar a capa".
 
 ---
 
@@ -381,31 +419,41 @@ pyinstaller --noconfirm --clean HqFriend.spec
 6. **Ciclo de Vida de Workers e Encerramento:**
     * *Varredura:* uma varredura pedida durante outra é enfileirada uma única vez; o resultado de uma raiz que mudou durante a varredura é descartado e a varredura é refeita (RF19-CA3).
     * *Miniaturas:* sinais de uma seleção anterior são descartados pelo contador de geração (`page_thumbnail_ready(generation, ...)`).
-    * *Encerramento:* ao fechar a janela, a `MainWindow` grava o bookmark pendente (`ReaderView.close_comic()`), aguarda as exportações em andamento (`ReaderView.shutdown()`) e chama `HomeView.shutdown()`, que bloqueia novas varreduras e gerações de capa e aguarda as threads ativas. Sem isso, o worker de capas podia iniciar uma geração pendente durante o encerramento e a janela era destruída com uma `QThread` ativa (corrigido na v1.0, Registro #015).
+    * *Encerramento:* ao fechar a janela, a `MainWindow` grava o bookmark pendente (`ReaderView.close_comic()`), aguarda as exportações em andamento (`ReaderView.shutdown()`) e chama `HomeView.shutdown()`, que bloqueia novas varreduras e gerações de capa e aguarda as threads ativas. Sem isso, o worker de capas podia iniciar uma geração pendente durante o encerramento e a janela era destruída com uma `QThread` ativa (corrigido na v1.0, Registro #015). *(FEAT-15)* `SeriesView.shutdown()` faz o mesmo com o `ComicCoverWorker`.
+7. **Capas das HQs (FEAT-15):**
+    * *Custo em `.cbr`:* sem a ADR-14, cada capa extrairia o arquivo inteiro; com `read_page`, cada capa é um processo `UnRAR.exe` que entrega só uma entrada. Em RAR *solid* com a primeira página no fim do fluxo, o `UnRAR.exe` ainda descompacta o que vem antes — aceito.
+    * *Caminhos longos:* `Documentos\HqFriend\covers\<Série>\<arquivo>.png` pode passar de 260 caracteres com nomes longos (o app não depende de *long paths* habilitados no Windows). A falha de gravação é tratada como capa indisponível (log + "Sem capa"), sem afetar as demais.
+    * *Concorrência com o leitor:* abrir uma HQ interrompe a geração; worker e leitor só leem os arquivos e nunca alteram o `AppState` fora da thread principal.
+    * *Seletor de capa da HQ e worker:* com o diálogo aberto a geração fica parada, para o worker não regravar a capa padrão por cima da escolhida. Se o worker estiver no meio da capa daquela mesma HQ ao abrir o diálogo, ele termina essa capa em segundo plano — muito antes de o usuário conseguir escolher uma página, já que as miniaturas precisam carregar primeiro.
+    * *Cache desatualizado:* a capa não é regerada se o arquivo for substituído por outro de mesmo nome (limitação aceita, `REQUISITOS.md` §6); "Restaurar capa padrão" regera sob demanda.
 
 ---
 
 ## 7. Estratégia de Testes
 
-> Migrada de `archive/v1.0/PLANO_DESENVOLVIMENTO.md` §1.1 e atualizada pelo FIX-01. A ligação de cada critério de aceite com sua verificação está em `REQUISITOS.md` §7.
+> Migrada de `archive/v1.0/PLANO_DESENVOLVIMENTO.md` §1.1 e atualizada pelo FIX-01 e pela FEAT-15. A ligação de cada critério de aceite com sua verificação está em `REQUISITOS.md` §7.
 
 ### 7.1. Organização
 * **pytest** para todas as camadas, inclusive a interface: `tests/domain/`, `tests/infrastructure/`, `tests/services/` e `tests/ui/`, espelhando `src/`. Execução: `.venv\Scripts\python.exe -m pytest` (`pytest.ini`: `pythonpath = .`, `testpaths = tests`).
 * **Rastreabilidade:** testes novos citam o critério que cobrem em comentário (`# RF14-CA3`, `# FIX-01 / RF21-CA1`); testes de FIX citam o pacote.
+* **Mutações (FEAT-15):** nas tarefas de interface, cada teste novo foi conferido introduzindo o defeito que ele deve pegar (ex: retirar a parada da geração ao sair da Tela da Série) e confirmando que o teste falha; testes que não pegavam o defeito foram reforçados.
 * **Verificação manual:** critérios que só podem ser observados no executável ou em medição (ex: RNF01, RNF04-CA5, RNF05-CA1/CA2) seguem roteiro manual registrado no pacote que os altera.
 
 ### 7.2. Isolamento
 * Testes nunca gravam nas pastas reais do usuário: `JsonStateRepository`, `LibraryService`, `CoverService` e `ExportService` recebem caminhos em `tmp_path`; a `MainWindow` aceita um `ExportService` injetável.
 * Bibliotecas de teste são montadas em `tmp_path` a partir das fixtures (`tests/ui/conftest.py::library_root`).
+* *(FEAT-15)* A `SeriesView` recebe o `CoverService` já apontado para `tmp_path`; testes de migração partem de um JSON `1.0` real gravado em `tmp_path` e nunca do `state.json` do usuário.
 
 ### 7.3. Fixtures de arquivos compactados
-* `tests/fixtures/build_fixtures.py` gera, via Pillow e o `Rar.exe` do WinRAR, os arquivos versionados em `tests/fixtures/`: ZIP simples, RAR4, RAR5, RAR5 *solid*, ZIP renomeado para `.cbr`, RAR renomeado para `.cbz`, sem imagens, com senha (arquivo e cabeçalho), ZIP/RAR truncados, arquivo vazio e texto renomeado.
+* `tests/fixtures/build_fixtures.py` gera, via Pillow e o `Rar.exe` do WinRAR, os arquivos versionados em `tests/fixtures/`: ZIP simples, RAR4, RAR5, RAR5 *solid*, ZIP renomeado para `.cbr`, RAR renomeado para `.cbz`, sem imagens, com senha (arquivo e cabeçalho), ZIP/RAR truncados, arquivo vazio e texto renomeado. *(FEAT-15)* `subpastas.cbz` / `subpastas.cbr` (RAR5 *solid*): páginas `cap1/01.jpg` e `cap2/01.jpg` (mesmo nome em pastas diferentes) e `@extra.png`, geradas por `write_subfolder_fixtures()`, que pode ser chamada sozinha para não regerar as demais.
+* `tests/fixtures/state_v1_0.json` *(FEAT-15)*: `state.json` real do schema `1.0`, ponto de partida dos testes de migração (`ARQUITETURA.md` §3.3).
 * Regenerar só é necessário ao criar novas fixtures; o `Rar.exe` **não** é dependência para rodar os testes.
 
 ### 7.4. Testes de interface (`tests/ui/`)
 * Executados em modo **offscreen** (`QT_QPA_PLATFORM=offscreen`), com `QT_QPA_FONTDIR` apontando para as fontes do Windows — sem isso, as medidas de texto ficam irreais (`conftest.py`).
 * A fixture de sessão `qapp` cria a `QApplication` e aplica o `dark_theme.qss`.
 * **`SignalRecorder`** (`conftest.py`) aguarda sinais rodando o loop de eventos. Não usar `QSignalSpy.wait()`: no PySide6 ele mantém o GIL durante a espera e impede a execução dos workers `QThread` escritos em Python. Crie o recorder **antes** da ação que emite o sinal.
+* *(FEAT-15)* Testes da grade da `SeriesView` aguardam o sinal `covers_loaded` (como a `HomeView`) e redimensionam a janela para verificar as 5 colunas a partir das posições dos itens (`visualItemRect`).
 
 ### 7.5. Armadilhas conhecidas do PySide6 / Qt 6
 * Passar um **sinal** como `clicked=` / `activated=` no construtor de um widget não o conecta (corrigido na v1.0, Registro #015): conecte com `.connect(...)`. Passar um *slot* (método ou função) funciona.

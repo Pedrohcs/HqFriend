@@ -1,11 +1,15 @@
-"""Leitura de HQs .cbz/.cbr em memória RAM, com ordenação natural de páginas (RNF04, ADR-01, ADR-06)."""
+"""Leitura de HQs .cbz/.cbr em memória RAM, com ordenação natural de páginas (RNF04, ADR-01, ADR-06).
+
+`open_archive()` abre a HQ inteira (leitor e seletor de capa); `read_page()` lê uma única
+página, para gerar capas (ADR-14).
+"""
 import logging
 import subprocess
 import threading
 import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path, PurePosixPath
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import rarfile
 
@@ -34,6 +38,33 @@ def _is_page(entry_name: str) -> bool:
 
 def _sorted_pages(entry_names) -> List[str]:
     return sorted((name for name in entry_names if _is_page(name)), key=natural_sort_key)
+
+
+def _list_zip(path: Path) -> Tuple[List[zipfile.ZipInfo], List[str]]:
+    """Entradas do ZIP e nomes das páginas em ordem natural; rejeita páginas criptografadas."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            infos = [info for info in zf.infolist() if not info.is_dir()]
+    except (zipfile.BadZipFile, OSError) as error:
+        raise InvalidComicError(f"Arquivo ZIP inválido: {path}") from error
+    page_names = _sorted_pages(info.filename for info in infos)
+    if any(info.flag_bits & 0x1 for info in infos if info.filename in page_names):
+        raise InvalidComicError(f"Arquivo ZIP protegido por senha: {path}")
+    return infos, page_names
+
+
+def _list_rar(path: Path) -> Tuple[List[rarfile.RarInfo], List[str]]:
+    """Entradas do RAR (ordem física) e nomes das páginas em ordem natural; rejeita senha."""
+    _configure_rarfile()
+    try:
+        with rarfile.RarFile(path) as rf:
+            infos = [info for info in rf.infolist() if not info.is_dir()]
+    except (rarfile.Error, OSError) as error:
+        raise InvalidComicError(f"Arquivo RAR inválido: {path}") from error
+    page_names = _sorted_pages(info.filename for info in infos)
+    if any(info.needs_password() for info in infos if info.filename in page_names):
+        raise InvalidComicError(f"Arquivo RAR protegido por senha: {path}")
+    return infos, page_names
 
 
 class IComicArchive(ABC):
@@ -74,14 +105,7 @@ class ZipArchiveStrategy(IComicArchive):
     """Extrai páginas sob demanda; cada thread usa seu próprio handle de ZipFile (ADR-04)."""
 
     def __init__(self, path: Path):
-        try:
-            with zipfile.ZipFile(path) as zf:
-                infos = [info for info in zf.infolist() if not info.is_dir()]
-        except (zipfile.BadZipFile, OSError) as error:
-            raise InvalidComicError(f"Arquivo ZIP inválido: {path}") from error
-        page_names = _sorted_pages(info.filename for info in infos)
-        if any(info.flag_bits & 0x1 for info in infos if info.filename in page_names):
-            raise InvalidComicError(f"Arquivo ZIP protegido por senha: {path}")
+        _, page_names = _list_zip(path)
         super().__init__(path, page_names)
         self._local = threading.local()
         self._handles: List[zipfile.ZipFile] = []
@@ -114,15 +138,7 @@ class RarArchiveStrategy(IComicArchive):
     """Extrai todo o arquivo para a RAM em uma única execução do UnRAR.exe (ADR-06)."""
 
     def __init__(self, path: Path):
-        _configure_rarfile()
-        try:
-            with rarfile.RarFile(path) as rf:
-                infos = [info for info in rf.infolist() if not info.is_dir()]
-        except (rarfile.Error, OSError) as error:
-            raise InvalidComicError(f"Arquivo RAR inválido: {path}") from error
-        page_names = _sorted_pages(info.filename for info in infos)
-        if any(info.needs_password() for info in infos if info.filename in page_names):
-            raise InvalidComicError(f"Arquivo RAR protegido por senha: {path}")
+        infos, page_names = _list_rar(path)
         super().__init__(path, page_names)
         self._pages = self._extract_pages(infos, set(page_names))
 
@@ -161,8 +177,8 @@ def _configure_rarfile() -> None:
             _rarfile_configured = True
 
 
-def open_archive(path: Path) -> IComicArchive:
-    """Abre uma HQ detectando o formato real pelos Magic Bytes, não pela extensão."""
+def _is_zip(path: Path) -> bool:
+    """Formato real pelos Magic Bytes, não pela extensão: True para ZIP, False para RAR."""
     try:
         with open(path, "rb") as file:
             signature = file.read(len(_RAR_SIGNATURE))
@@ -170,7 +186,51 @@ def open_archive(path: Path) -> IComicArchive:
         raise InvalidComicError(f"Não foi possível abrir {path}") from error
 
     if signature.startswith(_ZIP_SIGNATURES):
-        return ZipArchiveStrategy(path)
+        return True
     if signature.startswith(_RAR_SIGNATURE):
-        return RarArchiveStrategy(path)
+        return False
     raise InvalidComicError(f"Formato não reconhecido (nem ZIP nem RAR): {path}")
+
+
+def open_archive(path: Path) -> IComicArchive:
+    """Abre uma HQ detectando o formato real pelos Magic Bytes, não pela extensão."""
+    return ZipArchiveStrategy(path) if _is_zip(path) else RarArchiveStrategy(path)
+
+
+def _page_name(path: Path, page_names: List[str], page_index: int) -> str:
+    if not page_names:
+        raise InvalidComicError(f"Nenhuma imagem válida em {path}")
+    if not 0 <= page_index < len(page_names):
+        raise IndexError(f"Página {page_index} fora do intervalo 0..{len(page_names) - 1}")
+    return page_names[page_index]
+
+
+def read_page(path: Path, page_index: int) -> bytes:
+    """Lê uma única página sem abrir a HQ inteira (capas — ADR-14, RNF04-CA6).
+
+    Usa o mesmo filtro e a mesma ordenação de `open_archive()`, então o índice aponta para a
+    mesma página. Lança InvalidComicError para HQ inválida e IndexError para índice inexistente.
+    """
+    if _is_zip(path):
+        _, page_names = _list_zip(path)
+        entry_name = _page_name(path, page_names, page_index)
+        try:
+            with zipfile.ZipFile(path) as zf:
+                return zf.read(entry_name)
+        except (zipfile.BadZipFile, OSError, EOFError, ValueError) as error:
+            raise InvalidComicError(f"Página corrompida '{entry_name}' em {path}") from error
+
+    infos, page_names = _list_rar(path)
+    entry_name = _page_name(path, page_names, page_index)
+    [info] = [info for info in infos if info.filename == entry_name]
+    # `p` com o nome da entrada escreve no stdout só aquela entrada. O UnRAR só reconhece o
+    # caminho com "\" (o rarfile usa "/"), e `-@` impede que um nome iniciado por "@" seja
+    # lido como lista de arquivos.
+    process = subprocess.run(
+        [str(config.UNRAR_BINARY_PATH), "p", "-inul", "-p-", "-@", "--", str(path),
+         entry_name.replace("/", "\\")],
+        capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    if process.returncode != 0 or len(process.stdout) != info.file_size:
+        raise InvalidComicError(
+            f"Falha ao extrair '{entry_name}' de {path} (código {process.returncode})")
+    return process.stdout

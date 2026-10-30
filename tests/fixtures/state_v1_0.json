@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "root_directory": "C:\\Users\\Computador\\Desktop\\Pedro\\Leitura\\HQ",
+  "reader_preferences": {
+    "double_page_mode": true
+  },
+  "series": {
+    "Batman": {
+      "status": "IN_PROGRESS",
+      "custom_cover_image": "covers\\Batman.png",
+      "cover_source": {
+        "comic_filename": "Batman_01.cbz",
+        "page_index": 3
+      },
+      "comics": {
+        "Batman_01.cbz": {
+          "is_read": true,
+          "current_page": 23,
+          "total_pages": 24,
+          "last_read_at": "2026-10-24T16:00:00"
+        },
+        "Batman_02.cbr": {
+          "is_read": false,
+          "current_page": 11,
+          "total_pages": 32,
+          "last_read_at": "2026-10-24T16:15:00"
+        }
+      }
+    }
+  }
+}

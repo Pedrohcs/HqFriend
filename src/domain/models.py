@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 
 from src.domain.enums import SeriesStatus
 
+# Versão do schema do state.json (ARQUITETURA.md §3.3)
+STATE_SCHEMA_VERSION = "1.1"
+
 
 class CoverSource(BaseModel):
     comic_filename: str
@@ -19,6 +22,7 @@ class ComicState(BaseModel):
     current_page: int = 0            # Índice base-0 da página (ou da 1ª página do par) visível
     total_pages: int = 0             # Atualizado a cada abertura da HQ
     last_read_at: Optional[datetime] = None
+    custom_cover_page: Optional[int] = None  # Índice base-0 da capa da HQ; None = 1ª página (RF22, RF23)
 
 
 class SeriesState(BaseModel):
@@ -33,7 +37,7 @@ class ReaderPreferences(BaseModel):
 
 
 class AppState(BaseModel):
-    version: str = "1.0"
+    version: str = STATE_SCHEMA_VERSION
     root_directory: Optional[str] = None
     reader_preferences: ReaderPreferences = Field(default_factory=ReaderPreferences)
     series: Dict[str, SeriesState] = Field(default_factory=dict)
@@ -45,6 +49,8 @@ class ComicDTO:
     is_read: bool
     current_page: int
     total_pages: int
+    cover_path: Optional[Path] = None   # None enquanto a capa da HQ não está em cache
+    has_custom_cover: bool = False
 
     @property
     def is_in_progress(self) -> bool:

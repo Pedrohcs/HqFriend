@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog, QLabel
 
 from src.services.cover_service import CoverService
 from src.ui.dialogs import cover_picker_dialog as picker_module
@@ -222,3 +222,148 @@ def test_menu_da_home_abre_seletor_e_atualiza_card(qapp, library, covers, librar
     assert opened == ["Batman"]
     assert window.home_view.card("Batman").series.has_custom_cover
     window.home_view.shutdown()
+
+
+# ---- Modo HQ: capa de uma HQ (FEAT-15, RF23) ---------------------------------------------
+
+def _open_comic_dialog(library, covers, comic="Batman 2.cbr", series="Batman"):
+    dialog = CoverPickerDialog(library, covers, series, comic_filename=comic)
+    loaded = SignalRecorder(dialog.thumbnails_loaded)
+    dialog.show()
+    loaded.wait()
+    return dialog
+
+
+def _color_at_center(path):
+    image = Image.open(path).convert("RGB")
+    return image.getpixel((image.width // 2, image.height // 2))
+
+
+def test_modo_hq_mostra_so_as_paginas_da_hq_sem_passo_1(qapp, library, covers, opened_paths):
+    # FEAT-15 / RF23-CA2
+    dialog = _open_comic_dialog(library, covers)
+    try:
+        assert not dialog.comic_combo.isVisible()
+        assert "1. Escolha a HQ" not in [label.text() for label in dialog.findChildren(QLabel)]
+        assert "Batman 2.cbr" in dialog.windowTitle()
+        assert [name for name, _ in opened_paths] == ["Batman 2.cbr"]
+        assert opened_paths[0][1] is not threading.main_thread()
+        assert dialog.pages_list.count() == 4
+    finally:
+        dialog.close()
+
+
+def test_modo_hq_preseleciona_a_pagina_da_capa_atual(qapp, library, covers):
+    # FEAT-15 / RF23-CA2: página 1 com a capa padrão; a página escolhida, com capa customizada
+    dialog = _open_comic_dialog(library, covers)
+    assert dialog.selected_page_index() == 0
+    assert dialog.confirm_button.isEnabled()
+    dialog.close()
+
+    covers.set_comic_cover("Batman", "Batman 2.cbr", 2)
+    dialog = _open_comic_dialog(library, covers)
+    try:
+        assert dialog.selected_page_index() == 2
+    finally:
+        dialog.close()
+
+
+def test_modo_hq_com_hq_invalida_mostra_erro(qapp, library, covers):
+    # FEAT-15 / RF23-CA2: nada é alterado
+    dialog = _open_comic_dialog(library, covers, comic="Quebrada 1.cbz", series="Quebrada")
+    try:
+        assert dialog.pages_list.count() == 0
+        assert "Não foi possível abrir esta HQ" in dialog.status_label.text()
+        assert not dialog.confirm_button.isEnabled()
+        assert library.comic_cover_page("Quebrada", "Quebrada 1.cbz") is None
+    finally:
+        dialog.close()
+
+
+def test_modo_hq_fechar_durante_carregamento_libera_arquivo(qapp, library, covers,
+                                                           library_root):
+    # FEAT-15 / RF23-CA2
+    long_comic = library_root / "Batman" / "Batman 0.cbz"
+    _write_long_comic(long_comic)
+    library.apply_scan({"Batman": ["Batman 0.cbz", "Batman 1.cbz", "Batman 2.cbr"]})
+    dialog = CoverPickerDialog(library, covers, "Batman", comic_filename="Batman 0.cbz")
+    first_page = SignalRecorder(dialog._worker.page_thumbnail_ready)
+    dialog.show()
+    first_page.wait()
+    worker = dialog._worker
+
+    dialog.close()
+
+    assert worker.isFinished()
+    assert dialog.pages_list.count() < 60
+    long_comic.unlink()  # no Windows, falharia se o arquivo continuasse aberto
+
+
+def test_modo_hq_confirmar_define_capa_da_hq_e_nao_da_serie(qapp, library, covers):
+    # FEAT-15 / RF23-CA3, QA-12
+    dialog = _open_comic_dialog(library, covers)
+    _select_page(dialog, 2)
+
+    dialog.confirm_selection()
+
+    assert dialog.result() == QDialog.Accepted
+    assert library.comic_cover_page("Batman", "Batman 2.cbr") == 2
+    color = _color_at_center(library.comic_cover_path("Batman", "Batman 2.cbr"))
+    assert all(abs(a - b) <= 8 for a, b in zip(color, BLUE))
+    assert library.cover_source("Batman") is None
+    assert not library.cover_path("Batman").exists()
+
+
+def test_confirmar_capa_da_hq_atualiza_o_card_da_hq(qapp, library, covers, monkeypatch):
+    # FEAT-15 / RF23-CA1, RF23-CA3: menu da Tela da Série -> seletor -> card atualizado
+    from src.ui.views.series_view import COVER_ROLE
+
+    window = MainWindow(library, covers)
+    window.resize(1280, 800)
+    window.show()
+    try:
+        loaded = SignalRecorder(window.series_view.covers_loaded)
+        window.show_series("Batman")
+        loaded.wait()
+        series_cover_before = library.get_series("Batman").cover_path
+        opened, generation_calls = [], []
+        for name in ("stop_cover_generation", "start_cover_generation"):
+            original = getattr(window.series_view, name)
+            monkeypatch.setattr(window.series_view, name,
+                                lambda original=original, name=name: (
+                                    generation_calls.append(name), original()))
+
+        def fake_exec(dialog):
+            # Fluxo real do diálogo, sem o loop modal: carrega, escolhe a página 3 e confirma
+            opened.append((dialog.series_name, dialog.comic_filename))
+            # Geração parada com o diálogo aberto: o worker não regrava a capa escolhida
+            assert generation_calls == ["stop_cover_generation"]
+            thumbnails = SignalRecorder(dialog.thumbnails_loaded)
+            dialog.show()
+            thumbnails.wait()
+            _select_page(dialog, 2)
+            dialog.confirm_selection()
+            return dialog.result()
+
+        monkeypatch.setattr(picker_module.CoverPickerDialog, "exec", fake_exec)
+        [select_cover] = [action for action in
+                          window.series_view.build_comic_menu("Batman 2.cbr").actions()
+                          if action.text() == "Selecionar imagem de capa"]
+
+        assert select_cover.isEnabled()
+        select_cover.trigger()
+
+        assert opened == [("Batman", "Batman 2.cbr")]
+        assert generation_calls == ["stop_cover_generation", "start_cover_generation"]
+        item = next(window.series_view.comic_grid.item(row) for row in range(2)
+                    if window.series_view.comic_grid.item(row).text() == "Batman 2.cbr")
+        pixel = item.data(COVER_ROLE).toImage().pixelColor(4, 6)
+        assert all(abs(a - b) <= 8 for a, b in
+                   zip((pixel.red(), pixel.green(), pixel.blue()), BLUE))
+        assert library.get_series("Batman").cover_path == series_cover_before
+        assert "Restaurar capa padrão" in [
+            action.text() for action in window.series_view.build_comic_menu("Batman 2.cbr").actions()]
+    finally:
+        window.series_view.shutdown()
+        window.home_view.shutdown()
+        window.deleteLater()

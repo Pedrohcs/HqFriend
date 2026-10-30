@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.1 entregue** — v1.0.1 + **FEAT-14** concluída. Nenhum pacote em andamento; próximos IDs livres: `FEAT-15` / `FIX-02`. Próximos IDs livres: `FEAT-15` / `FIX-02`.
+**Etapa Atual:** ✅ **v1.2 entregue** — v1.1 + **FEAT-15** concluída. Nenhum pacote em andamento; próximos IDs livres: `FEAT-16` / `FIX-02`.
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -29,6 +29,7 @@
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
 | **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF15, RF19, RF21, RNF06, RNF07, RNF08 | `concluida` | [FIX-01](archive/v1.0.1/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). 4 blocos concluídos; executável validado pelo usuário (roteiro M2) |
 | **FEAT-14** | v1.1 | Manter o zoom ao trocar de página | RF15, US09 | `concluida` | [FEAT-14](archive/v1.1/FEAT-14/spec.md) | QA-07 a QA-10 (opção A); 250 testes; executável validado pelo usuário (roteiros M2 e M3) |
+| **FEAT-15** | v1.2 | Capa das HQs e grade de capas na Tela da Série | RF05, RF22, RF23, RNF02, RNF04, RNF05, US06, US14, ADR-14 | `concluida` | [FEAT-15](archive/v1.2/FEAT-15/spec.md) | QA-11 a QA-14 (opção recomendada); 353 testes; schema `1.0` → `1.1` (primeira migração); ADR-14 aceita; executável validado pelo usuário (roteiros M2 e M3) |
 
 ---
 
@@ -403,3 +404,123 @@
     * **A cargo do usuário:** commit, MR da branch `feat/FEAT-14-manter-zoom-entre-paginas` para a `main` e tag `v1.1`.
     * `FEAT-14` $\rightarrow$ `concluida`.
 
+
+### [Registro #037] — 2026-10-29 — FEAT-15 Especificada e Planejada (Capa das HQs e Grade de Capas na Tela da Série)
+* **Responsável:** Tech Lead / Analista de Requisitos Sênior
+* **Etapa Atual:** `FEAT-15` (alvo: v1.2) com `spec.md`, `plan.md` e `tasks.md` em `docs/changes/FEAT-15/`, aguardando a aprovação do delta (QA-13 e QA-14) e a revisão do plano para iniciar a implementação.
+* **Resumo das Mudanças:**
+    * **Pedido do usuário:** cada HQ tem uma capa, como as séries; ao abrir uma série, as HQs aparecem em uma grade 5x5; a capa padrão é a primeira imagem do `.cbr`/`.cbz`, e o usuário pode escolher outra pelo botão direito.
+    * **Classificação:** FEAT, não FIX — a lista de texto da Tela da Série é o que o RF05-CA1 pede.
+    * **Decisões do usuário:** **QA-11** — grade sempre com 5 colunas, cards acompanhando a largura da janela e rolagem vertical (sem paginação); **QA-12** — capa da HQ independente da capa da série (RF11 inalterado).
+    * **Recomendadas, pendentes de aprovação:** **QA-13** — seletor da HQ só com as páginas da própria HQ (galeria sem o passo 1); **QA-14** — capas das HQs geradas ao abrir a série, só para as que não estão em cache.
+    * **Delta:** RF05 modificado (grade; CA1 alterado, CA2 novo); RF22 (capa padrão da HQ) e RF23 (seleção da capa da HQ) adicionados; RNF02 (CA5 — migração `1.0 → 1.1` com cópia `state.v1.0.json`; CA6 — versão futura não é sobrescrita), RNF04 (CA6 — página única em `.cbr`) e RNF05 (CA4 — Tela da Série responsiva com 100+ HQs) modificados; US06 modificada e US14 adicionada.
+    * **Plano:** `ComicState.custom_cover_page` (schema `1.1`, primeira mudança de schema — implementa o mecanismo de migração de `ARQUITETURA.md` §3.3); cache em `covers\<Série>\<arquivo>.png`; `archive_reader.read_page()` para gerar capas sem extrair o `.cbr` inteiro (**ADR-14**, `Proposta`); `ComicCoverWorker`; `SeriesView` com `QListWidget` em `IconMode` e *delegate*; `CoverPickerDialog` em modo HQ. Tarefas T1–T16.
+    * **Aplicação antecipada na spec vigente (pedido do usuário):** o delta já foi escrito em `specs/REQUISITOS.md` (versão `1.2`; matriz com **102 critérios** — 85 automáticos, 13 automáticos com complemento manual, 4 manuais —, testes novos marcados *(planejado)*; roteiros M2 passo 7 e M3 passo 3), `specs/ARQUITETURA.md` (§2, §3.1 a §3.3, nova §4.4, ADR-14) e `specs/TECNICO.md` (§2, §3.2, §3.3, §3.7, §4.1, §4.3, nova §4.4, §6, §7), cada um com aviso de que descreve o comportamento planejado nesta branch. A Sincronização passa a conferir a spec contra o código. A branch não deve ir para a `main` antes da conclusão do pacote.
+    * **IDs reservados pela FEAT-15:** RF22, RF23, US14, QA-11 a QA-14 e ADR-14. Próximos IDs livres atualizados em `docs/README.md` (`FEAT-16`, `RF24`, `US15`, `QA-15`, `ADR-15`).
+    * Branch `feat/FEAT-15-capa-das-hqs` criada a partir da `main` (commit `17aaa67`).
+    * `FEAT-15` $\rightarrow$ `pendente`.
+
+### [Registro #038] — 2026-10-29 — FEAT-15: Spec e Plano Aprovados; T1 Concluído
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 concluído, próximo: T2 (migração do `state.json`).
+* **Resumo das Mudanças:**
+    * **`spec.md` e `plan.md` aprovados pelo usuário** com as opções recomendadas: **QA-13** — seletor da HQ só com as páginas da própria HQ; **QA-14** — capas das HQs geradas ao abrir a série, só para as que não estão em cache. `specs/REQUISITOS.md` §6 atualizado (QA-13 e QA-14 decididas).
+    * **T1 — domínio:** `ComicState.custom_cover_page` (opcional, base-0), `STATE_SCHEMA_VERSION = "1.1"` como versão padrão do `AppState`, `ComicDTO.cover_path` / `has_custom_cover` (com valores padrão, sem quebrar quem cria o DTO) e `FutureStateVersionError` (`src/domain/models.py`, `src/domain/errors.py`).
+    * **Testes:** 6 novos em `tests/domain/` (versão do schema, JSON `1.0` sem o campo continua válido, serialização da página da capa, rejeição de tipo inválido, DTO sem capa, mensagem da versão futura), citando `# FEAT-15 / ...`; falham sem a mudança. **256 testes passando.**
+    * **Estado intermediário conhecido:** até o T2, um `state.json` `1.0` existente é carregado e regravado com `"version": "1.0"` (o campo vem do arquivo); só estados novos nascem `1.1`. O T2 fecha isso com a migração.
+    * `FEAT-15` $\rightarrow$ `em andamento`.
+
+### [Registro #039] — 2026-10-29 — FEAT-15: T2 Concluído (Migração do `state.json`)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 e T2 concluídos, próximo: T3 (aviso e encerramento com `state.json` de versão futura no `main.py`).
+* **Resumo das Mudanças:**
+    * **`src/infrastructure/state_migrations.py` (novo):** `MIGRATIONS` com a função pura `1.0 → 1.1`; `migrate(data)` aplica a cadeia até `STATE_SCHEMA_VERSION` e devolve a versão original; versões comparadas como `(maior, menor)`; arquivo sem `version` é tratado como `1.0`; versão futura lança `FutureStateVersionError`; conteúdo irreconhecível lança `ValueError` (fluxo de arquivo corrompido).
+    * **`JsonStateRepository.load()`:** lê o JSON, migra e só então valida; se houve migração, copia o original para `state.v<versão>.json` antes de qualquer gravação, sem sobrescrever uma cópia existente; a recuperação pelo `.bak` passa pelo mesmo caminho. Versão futura propaga a exceção sem renomear, copiar para o `.bak` nem regravar o arquivo. `LoadResult` ganhou `migrated_from`. Fecha o estado intermediário do T1: um `state.json` `1.0` passa a ser regravado como `1.1`.
+    * **Testes:** fixture `tests/fixtures/state_v1_0.json` (contrato `1.0` real); `tests/infrastructure/test_state_migrations.py` (novo, 16 casos) e 5 testes novos em `test_json_repository.py`, citando `# FEAT-15 / RNF02-CA5/CA6`. Sem a mudança, 5 testes do repositório falham e o módulo de migrações não carrega; `test_copia_do_original_nao_e_sobrescrita` é uma guarda e passa nos dois casos. **277 testes passando.**
+    * **Spec:** matriz (`REQUISITOS.md` §7) de RNF02-CA5 e CA6 com os nomes reais dos testes (o teste do `main.py` continua *planejado*, T3); `TECNICO.md` §3.2 detalha o que é tratado como arquivo corrompido e que o `.bak` também é migrado.
+
+### [Registro #040] — 2026-10-29 — FEAT-15: T3 Concluído (Versão Futura do `state.json` na Inicialização)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 a T3 concluídos (RNF02-CA5 e CA6 fechados), próximo: T4 (`archive_reader.read_page`, ADR-14).
+* **Resumo das Mudanças:**
+    * **`src/main.py`:** `library.load_state()` trata `FutureStateVersionError` — registra em log, exibe `QMessageBox.critical` com `future_version_message()` (aviso "versão mais nova do HqFriend" + versão do arquivo e suportada), libera a trava de instância única e retorna `1` antes de criar a janela; o `state.json` não é tocado.
+    * **Testes:** `tests/ui/test_main.py` (novo, 2 testes) roda o `main()` com pastas, log e trava isolados por *monkeypatch* e um `state.json` `2.0` real em `tmp_path`: confere o aviso, o código de saída, a trava liberada, a janela não criada e o arquivo intacto. Falham sem a mudança. **279 testes passando.**
+    * **Desvio (registrado em `tasks.md`):** o teste ficou em `tests/ui/test_main.py`, e não em `tests/test_main.py`, para usar o `qapp` *offscreen*; matriz (`REQUISITOS.md` §7) e `plan.md` atualizados. `TECNICO.md` §3.2 detalha o encerramento.
+
+### [Registro #041] — 2026-10-29 — FEAT-15: T4 Concluído (Leitura de Página Única — ADR-14)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 a T4 concluídos, próximo: T5 (`LibraryService` com a capa da HQ).
+* **Resumo das Mudanças:**
+    * **`src/infrastructure/archive_reader.py`:** nova `read_page(path, page_index)`. ZIP lê uma única entrada; RAR executa um único `UnRAR.exe p -inul -p- -@ -- <arquivo> <entrada>` com `CREATE_NO_WINDOW` e confere o tamanho e o código de saída. Listagem (`_list_zip` / `_list_rar`) e detecção de formato (`_is_zip`) extraídas e compartilhadas com `open_archive()`, garantindo o mesmo índice nos dois caminhos.
+    * **Achados no UnRAR 7.23 embarcado** (testados à mão antes de implementar): o caminho da entrada só casa com `\` (o `rarfile` devolve `/`); um nome sem pasta casa só a entrada da raiz; um argumento iniciado por `@` é lido como arquivo-lista, o que o `-@` desliga. Registrados na ADR-14 e no `TECNICO.md` §3.3.
+    * **Desvios (registrados em `tasks.md`):** índice fora do intervalo lança `IndexError`, e não `InvalidComicError`, para o T6 cair na capa padrão (RF23-CA5); a chamada ganhou `-@` e a conversão de `/` para `\`.
+    * **Testes:** fixtures `subpastas.cbz` / `subpastas.cbr` (RAR5 *solid* com `cap1/01.jpg`, `cap2/01.jpg` e `@extra.png`), geradas por `write_subfolder_fixtures()` sem regerar as demais; 32 casos novos em `tests/infrastructure/test_archive_reader.py` (bytes iguais aos de `open_archive()`, um processo por página, subpastas, CBZ sem processo, inválidos, índice fora do intervalo, extração divergente, sem temporários). Sem a conversão de `/` caem 3 testes; sem `-@`, 7. **311 testes passando.**
+    * **Spec:** matriz (`REQUISITOS.md` §7) de RNF04-CA6 com os nomes reais; `TECNICO.md` §3.3 e §7.3 (fixtures novas); ADR-14 com os achados (continua `Proposta` até a medição do M3).
+    * **Correção de registro:** o Registro #038 tinha um caractere de controle no lugar de `\r` em `$\rightarrow$` (gerado pelo script de atualização), o que fazia o Git ver o arquivo inteiro como alterado; o caractere foi trocado pelo texto pretendido, sem mudar o conteúdo do registro.
+
+### [Registro #042] — 2026-10-29 — FEAT-15: T5 Concluído (Capa da HQ no `LibraryService`)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 a T5 concluídos, próximo: T6 (`CoverService`: geração, customização e restauração da capa da HQ).
+* **Resumo das Mudanças:**
+    * **`src/services/library_service.py`:** `comic_cover_path()` (`covers\<Série>\<arquivo>.png`, com a extensão da HQ no nome para `X.cbz` e `X.cbr` não colidirem); `comic_cover_page()` e `set_comic_cover_page()` (grava ou limpa `custom_cover_page` e persiste); `comics_without_cover()` (HQs presentes no disco sem capa em cache, em ordem natural); `get_series()` preenche `ComicDTO.cover_path` (só se o arquivo existe) e `has_custom_cover`. Auxiliar `_existing()` reaproveitado também na capa da série.
+    * **Testes:** 6 novos em `tests/services/test_library_service.py` (caminho da capa, DTO com capa em cache e pendências em ordem natural, HQs fora do disco ignoradas, persistência e limpeza da página customizada, independência da capa da série — QA-12, `KeyError` para HQ inexistente), citando `# FEAT-15 / ...`; falham sem a mudança. **317 testes passando.**
+    * **Spec:** matriz (`REQUISITOS.md` §7) de RF22-CA2/CA3 e RF23-CA3/CA4 com os testes reais do `LibraryService`, ao lado dos testes *planejados* do `CoverService` (T6). Sem desvios em relação ao plano.
+
+### [Registro #043] — 2026-10-29 — FEAT-15: T6 Concluído (Capa da HQ no `CoverService`)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 a T6 concluídos (camadas de domínio, infraestrutura e serviços prontas), próximo: T7 (`ComicCoverWorker`).
+* **Resumo das Mudanças:**
+    * **`src/services/cover_service.py`:** `ComicCoverJob` (arquivo, caminho da HQ, caminho da capa, página) montado na thread principal por `comic_cover_jobs()`; `ensure_comic_cover()` gera a capa sem acessar o estado (seguro para o worker), devolve `None` e registra em log quando a HQ é inválida ou a página é ilegível (RF22-CA4) e, se a página customizada não existe mais, usa a página 0 sem alterar o `state.json` (RF23-CA5); `set_comic_cover()` e `restore_comic_cover()` (RF23-CA3/CA4), sem tocar na capa da série (QA-12).
+    * **ADR-14 aplicada às séries:** `ensure_default_cover()` e `set_custom_cover()` passam a ler a página com `read_page()`, sem abrir a HQ inteira; o comportamento da capa da série não muda (testes existentes passando sem alteração).
+    * **Testes:** 10 novos em `tests/services/test_cover_service.py` (página 0 em ordem natural, redução a 400 px em `covers\<Série>\`, cache não reabre a HQ, HQ corrompida e página ilegível sem impedir as demais, customizar, independência da capa da série, restaurar, regerar da página registrada, página inexistente cai na padrão, séries sem `open_archive`), citando `# FEAT-15 / ...`; todos falham sem a mudança. **327 testes passando.**
+    * **Spec:** matriz (`REQUISITOS.md` §7) de RF22-CA2 a CA4, RF23-CA3 a CA5 e RNF04-CA6 com os testes reais; restam 15 testes *planejados*, todos de UI (T8 a T10). Sem desvios em relação ao plano.
+
+### [Registro #044] — 2026-10-29 — FEAT-15: T7 Concluído (`ComicCoverWorker`)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 a T7 concluídos, próximo: T8 (`SeriesView` em grade de capas).
+* **Resumo das Mudanças:**
+    * **`src/ui/workers/comic_cover_worker.py` (novo):** `ComicCoverWorker(covers, series_name, jobs)` gera as capas das HQs na ordem dos *jobs* e emite `comic_cover_ready(série, arquivo, caminho ou None)`; verifica `isInterruptionRequested()` entre HQs, terminando após a capa em andamento (RF22-CA5). Não acessa o `AppState`: só chama `CoverService.ensure_comic_cover()` com *jobs* montados na thread principal.
+    * **Testes:** `tests/ui/test_comic_cover_worker.py` (novo, 3 testes) — capas geradas em ordem e fora da thread principal (RF22-CA1, RNF05-CA4), HQ inválida emitida sem capa (RF22-CA4) e interrupção após a capa em andamento (RF22-CA5); o arquivo não carrega sem o módulo e a mutação sem a checagem de interrupção derruba o teste correspondente. `tests/ui` repetido 3 vezes sem falhas. **330 testes passando.**
+    * **Spec:** matriz (`REQUISITOS.md` §7) de RF22-CA1, CA4, CA5 e RNF05-CA4 com os testes do worker, ao lado dos testes *planejados* da `SeriesView` (T8). Sem desvios em relação ao plano.
+
+### [Registro #045] — 2026-10-30 — FEAT-15: T8 e T9 Concluídos (Tela da Série em Grade de Capas)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar); T1 a T9 concluídos, próximo: T10 (`CoverPickerDialog` em modo HQ).
+* **Resumo das Mudanças:**
+    * **`src/ui/views/series_view.py` reescrita:** o `QTreeWidget` virou o `QListWidget` `comicGrid` em `IconMode` com o `ComicCardDelegate` (capa 2:3, nome abreviado com o completo no *tooltip*, status colorido, destaque sob o cursor e borda âmbar na seleção); sempre 5 colunas, recalculadas no redimensionamento com a barra vertical sempre descontada (sem oscilação) e largura mínima de 120 px por card; *placeholders* "Carregando capa…" / "Sem capa"; geração pelo `ComicCoverWorker` com fila de um pedido pendente, sinais de outra série ignorados e `shutdown()`; grade atualizada no lugar (seleção e rolagem preservadas); menu da HQ com "Selecionar imagem de capa" (sinal `comic_cover_selection_requested`, habilitada só com seletor disponível) e "Restaurar capa padrão" (só com capa customizada); novo texto de ajuda.
+    * **`src/ui/main_window.py`:** `SeriesView(library, covers)`; para a geração ao voltar para a Home e ao abrir uma HQ, retoma ao fechar o leitor e chama `series_view.shutdown()` ao fechar a janela (RF22-CA5). **`dark_theme.qss`:** regras do `QTreeWidget#comicList` substituídas por `QListWidget#comicGrid`.
+    * **T9:** testes atuais de `tests/ui/test_series_view.py` adaptados à grade com as mesmas asserções (RF05, RF08, RF13, RF20).
+    * **Testes novos (17):** abreviação do nome, 5 colunas em 900/1280/1920 px, cards acompanhando a janela, largura mínima, capas fora da thread principal com "Carregando capa…", capas em cache sem regerar, "Sem capa" para HQ inválida, interrupção ao voltar e ao abrir HQ com o arquivo liberado, retomada ao voltar e ao fechar o leitor, "Carregando capa…" mantido ao marcar a HQ durante a geração, sinal de outra série ignorado, seleção e rolagem preservadas, menu com e sem "Restaurar capa padrão". **9 mutações** no código (sem parar/retomar, largura fixa, sem largura mínima, grade reconstruída, *placeholder*, menu, sinal de outra série) derrubam ao menos um teste cada — as duas que sobreviveram na primeira rodada ganharam testes. **347 testes passando**; `tests/ui` 3 vezes sem falhas.
+    * **Conferência visual:** a grade foi renderizada *offscreen* com o tema (13 HQs, nome longo, HQ corrompida, HQ lida e em andamento) e conferida em imagem.
+    * **Desvios (registrados em `tasks.md` e levados à spec):** RF05-CA2 — em vez de rolagem horizontal abaixo de 120 px, a Tela da Série não encolhe abaixo de 5 cards de 120 px (o `IconMode` quebraria a linha; com a janela mínima de 800 px o limite não é atingido); ligação da `MainWindow` antecipada do T10 para o T8; capa em memória pelo original com chave de data de modificação. `REQUISITOS.md` (RF05-CA2 e matriz, restam 4 testes *planejados*, do T10) e `TECNICO.md` §4.4 atualizados.
+
+### [Registro #046] — 2026-10-30 — FEAT-15: T10 a T12 Concluídos (Seletor de Capa da HQ; Implementação Completa)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 3 (Implementar) **concluída** (T1 a T12); próxima: Sincronização (T13 a T15) e executável com os roteiros M2/M3 validados pelo usuário (T16).
+* **Resumo das Mudanças:**
+    * **`src/ui/dialogs/cover_picker_dialog.py`:** modo HQ com `comic_filename=` (só por nome): sem o passo 1, título com o nome da HQ, galeria só das páginas daquela HQ com a página da capa atual pré-selecionada (página 1 com a capa padrão) e confirmação por `CoverService.set_comic_cover()` (RF23-CA2/CA3). O combo do passo 1 passou a ter o diálogo como pai.
+    * **`src/ui/main_window.py`:** `SeriesView(..., cover_picker_available=True)`; `open_comic_cover_picker()` para a geração das capas, abre o seletor da HQ, atualiza a grade se a capa foi confirmada e retoma a geração (evita que o worker regrave a capa padrão por cima da escolhida).
+    * **Testes:** 6 novos em `tests/ui/test_cover_picker_dialog.py` — modo HQ sem o passo 1 e só com as páginas da HQ, pré-seleção da página atual, HQ inválida sem alterar nada, fechar durante o carregamento libera o arquivo, confirmar grava a capa da HQ e não a da série, e o fluxo completo pelo menu da Tela da Série com o card atualizado e a geração parada durante o diálogo. Um teste existente (`test_menu_da_home_abre_seletor_e_atualiza_card`) pegou a quebra do `parent` posicional, corrigida antes de seguir. **8 mutações** derrubam ao menos um teste cada; a única que sobreviveu na primeira rodada mostrou que o `hide()` do combo não tinha efeito (o combo estava sem pai), corrigido. Diálogo conferido em imagem renderizada *offscreen*.
+    * **T11 e T12:** testes novos de todas as tarefas citam o critério e falham sem a mudança (mutações nas tarefas de interface). **353 testes passando** (250 da v1.1 + 103 da FEAT-15); `tests/ui` (108) 3 vezes sem falhas.
+    * **Spec:** matriz (`REQUISITOS.md` §7) sem nenhum teste *planejado* — todos os critérios da FEAT-15 têm teste real; `TECNICO.md` §4.4 e §6 e `ARQUITETURA.md` §2.1 com o seletor da HQ e a pausa da geração. Desvios registrados em `tasks.md`.
+
+### [Registro #047] — 2026-10-30 — FEAT-15: Sincronização Concluída (T13–T15) e Executável Gerado (T16)
+* **Responsável:** Analista de Requisitos Sênior / Tech Lead
+* **Etapa Atual:** `FEAT-15` em andamento — etapa 4 (Sincronizar) concluída e executável gerado; aguardando a validação manual do usuário (T16: roteiro M2 passo 7 e roteiro M3 passo 3, com a medição do tempo por capa para a ADR-14) para concluir e arquivar o pacote em `docs/archive/v1.2/`.
+* **Resumo das Mudanças:**
+    * **T13 — `specs/REQUISITOS.md`:** matriz conferida automaticamente contra a spec e a coleta do pytest — 102 critérios com linha (85 automáticos, 13 automáticos com complemento manual, 4 manuais, 0 lacunas) e os 199 testes citados existentes (353 testes); resumo da matriz atualizado; aviso de aplicação antecipada removido; versão da spec `1.2` (2026-10-30).
+    * **T14 — `specs/ARQUITETURA.md` e `specs/TECNICO.md`:** nomes citados conferidos contra o código; avisos de aplicação antecipada removidos; `TECNICO.md` §7 registra a conferência por mutações. Os desvios já tinham sido levados à spec em cada tarefa. **ADR-14 continua `Proposta`** até a medição do M3.
+    * **T15 — `README.md` (raiz):** grade de capas e capa da HQ nas funcionalidades, fluxo da Tela da Série, seleção de capa da série e da HQ, pastas `covers\<Série>\` e `state.v1.0.json`. **`docs/README.md`:** reservas da FEAT-15 (RF22, RF23, US14, QA-11 a QA-14, ADR-14) marcadas como aplicadas.
+    * **T16 — executável:** `.venv\Scripts\pyinstaller.exe --noconfirm --clean HqFriend.spec` sem erros (~24 s) $\rightarrow$ `dist\HqFriend\HqFriend.exe`, com `_internal\bin\UnRAR.exe` e `license.txt`. Conferido no pacote que os módulos novos e alterados da FEAT-15 foram embarcados (`ComicCardDelegate`, `read_page`, `state_migrations`, `comic_cover_worker`, `open_comic_cover_picker` e o tratamento de versão futura no script de entrada). O executável **não foi aberto pelo agente**, porque migraria o `state.json` real do usuário — isso faz parte da validação manual.
+
+### [Registro #048] — 2026-10-30 — FEAT-15 Concluída (v1.2)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** ✅ **v1.2 entregue.** Nenhum pacote em andamento; próximos IDs livres: `FEAT-16` / `FIX-02`.
+* **Resumo das Mudanças:**
+    * **Validação manual (T16)** confirmada pelo usuário no executável `dist\HqFriend\HqFriend.exe`: roteiro M2, passo (7) — grade de 5 colunas, capas de `.cbr` e `.cbz` reais sem janela de console, troca e restauração da capa de uma HQ, pasta `covers\<Série>\` — e roteiro M3, passo (3) — série com 100+ HQs `.cbr` sem capas em cache, com a Tela da Série abrindo de imediato e respondendo durante a geração. Fecha o complemento manual de RF05-CA2, RF22-CA1, RNF04-CA6 e RNF05-CA4.
+    * **ADR-14 $\rightarrow$ `Aceita`**, com base na verificação automática e na responsividade confirmada no M3. O tempo por capa não foi informado na validação; a ADR registra que não há medição numérica.
+    * **Definição de Pronto** do `tasks.md` cumprida integralmente.
+    * **Entregas da FEAT-15:** Tela da Série em grade de capas com 5 colunas (RF05); capa padrão de cada HQ, a primeira página do arquivo, gerada em segundo plano e guardada em `covers\<Série>\` (RF22); escolha e restauração da capa da HQ pelo botão direito, independente da capa da série (RF23, QA-12); leitura de página única para gerar capas sem extrair o `.cbr` inteiro (RNF04-CA6, ADR-14); primeira migração do `state.json` (`1.0` $\rightarrow$ `1.1`, cópia `state.v1.0.json`, recusa de versão futura — RNF02-CA5/CA6); spec vigente `1.2` sincronizada; **353 testes** passando.
+    * **Pacote arquivado** em `docs/archive/v1.2/FEAT-15/` (índice em `docs/archive/README.md`).
+    * **A cargo do usuário:** commit, MR da branch `feat/FEAT-15-capa-das-hqs` para a `main` e tag `v1.2`.
+    * `FEAT-15` $\rightarrow$ `concluida`.

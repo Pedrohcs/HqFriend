@@ -1,4 +1,4 @@
-"""Seleção de capa em 2 etapas: escolha da HQ e galeria de páginas (RF11, RF12)."""
+"""Seleção de capa: da série em 2 etapas (escolha da HQ e galeria de páginas) ou de uma HQ (RF11, RF12, RF23)."""
 import logging
 from typing import List, Optional
 
@@ -19,17 +19,27 @@ PAGE_INDEX_ROLE = Qt.UserRole
 
 
 class CoverPickerDialog(QDialog):
+    """Sem `comic_filename`, escolhe a capa da série (RF12); com ele, a capa daquela HQ (RF23).
+
+    No modo HQ não há o passo 1: a galeria mostra só as páginas da HQ, com a página da capa
+    atual pré-selecionada (QA-13).
+    """
     thumbnails_loaded = Signal()
 
     def __init__(self, library: LibraryService, covers: CoverService, series_name: str,
-                 parent=None):
+                 parent=None, *, comic_filename: Optional[str] = None):
         super().__init__(parent)
-        self.setWindowTitle(f"Selecionar imagem de capa — {series_name}")
+        self.setWindowTitle(f"Selecionar imagem de capa — {comic_filename or series_name}")
         self.setModal(True)
         self.resize(1000, 720)
         self._library = library
         self._covers = covers
         self.series_name = series_name
+        self.comic_filename = comic_filename
+        self._initial_page: Optional[int] = None
+        if comic_filename is not None:
+            current_page = library.comic_cover_page(series_name, comic_filename)
+            self._initial_page = current_page if current_page is not None else 0
         self._generation = 0
         self._worker: Optional[ThumbnailWorker] = None
         self._retiring_workers: List[ThumbnailWorker] = []
@@ -39,7 +49,7 @@ class CoverPickerDialog(QDialog):
     # ---- Interface ---------------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        self.comic_combo = QComboBox()
+        self.comic_combo = QComboBox(self)
         self.comic_combo.currentIndexChanged.connect(self._on_comic_changed)
 
         self.pages_list = QListWidget(objectName="thumbnailGrid")
@@ -65,19 +75,26 @@ class CoverPickerDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
-        layout.addWidget(QLabel("1. Escolha a HQ", objectName="stepTitle"))
-        layout.addWidget(self.comic_combo)
-        layout.addSpacing(6)
-        layout.addWidget(QLabel("2. Clique na página que será a capa da série",
-                                objectName="stepTitle"))
+        if self.comic_filename is None:
+            layout.addWidget(QLabel("1. Escolha a HQ", objectName="stepTitle"))
+            layout.addWidget(self.comic_combo)
+            layout.addSpacing(6)
+            pages_title = "2. Clique na página que será a capa da série"
+        else:
+            self.comic_combo.hide()  # modo HQ: a HQ já está definida (RF23)
+            pages_title = "Clique na página que será a capa desta HQ"
+        layout.addWidget(QLabel(pages_title, objectName="stepTitle"))
         layout.addWidget(self.pages_list, stretch=1)
         layout.addLayout(buttons)
         self._update_confirm_button()
 
     def _populate_comics(self) -> None:
-        comics = self._covers.get_comics_list(self.series_name)
-        source = self._library.cover_source(self.series_name)
-        initial = comics.index(source.comic_filename) if source and source.comic_filename in comics else 0
+        if self.comic_filename is not None:
+            comics, initial = [self.comic_filename], 0
+        else:
+            comics = self._covers.get_comics_list(self.series_name)
+            source = self._library.cover_source(self.series_name)
+            initial = comics.index(source.comic_filename) if source and source.comic_filename in comics else 0
         self.comic_combo.blockSignals(True)
         self.comic_combo.addItems(comics)
         self.comic_combo.setCurrentIndex(initial)
@@ -118,6 +135,9 @@ class CoverPickerDialog(QDialog):
         item.setData(PAGE_INDEX_ROLE, page_index)
         item.setTextAlignment(Qt.AlignHCenter)
         self.pages_list.addItem(item)
+        if page_index == self._initial_page:
+            self.pages_list.setCurrentItem(item)  # capa atual da HQ (RF23-CA2)
+            self.pages_list.scrollToItem(item)
         self.status_label.setText(f"Carregando páginas… ({self.pages_list.count()})")
 
     @Slot(int, str)
@@ -159,9 +179,12 @@ class CoverPickerDialog(QDialog):
         if page_index is None:
             return
         try:
-            self._covers.set_custom_cover(self.series_name, self.selected_comic(), page_index)
+            if self.comic_filename is None:
+                self._covers.set_custom_cover(self.series_name, self.selected_comic(), page_index)
+            else:
+                self._covers.set_comic_cover(self.series_name, self.comic_filename, page_index)
         except (InvalidComicError, OSError, ValueError):
-            logger.exception("Falha ao definir capa de %s", self.series_name)
+            logger.exception("Falha ao definir capa de %s", self.comic_filename or self.series_name)
             QMessageBox.warning(self, "HqFriend", "Não foi possível salvar a capa a partir "
                                                   "desta página.")
             return

@@ -27,6 +27,13 @@ EXTRA_FILES = {
     "info.txt": b"metadados da HQ",
     "__MACOSX/._1.jpg": b"metadados do macOS",
 }
+# Páginas em subpastas com o mesmo nome e um nome iniciado por "@", que o UnRAR leria como
+# lista de arquivos (leitura de página única — ADR-14). Ordem natural: @extra, cap1, cap2.
+SUBFOLDER_PAGES = {
+    "cap2/01.jpg": ((0, 255, 255), "JPEG"),
+    "cap1/01.jpg": ((255, 0, 255), "JPEG"),
+    "@extra.png": ((128, 128, 128), "PNG"),
+}
 
 
 def _page_bytes(color, image_format) -> bytes:
@@ -58,6 +65,13 @@ def _write_rar(path: Path, contents: dict, *switches: str) -> None:
                        cwd=work_dir, check=True)
 
 
+def write_subfolder_fixtures() -> None:
+    contents = {name: _page_bytes(*spec) for name, spec in SUBFOLDER_PAGES.items()}
+    _write_zip(FIXTURES_DIR / "subpastas.cbz", contents)
+    # `-@`: o Rar.exe também leria "@extra.png" como lista de arquivos
+    _write_rar(FIXTURES_DIR / "subpastas.cbr", contents, "-ma5", "-s", "-@")
+
+
 def main() -> None:
     if not RAR_EXE.is_file():
         sys.exit(f"Rar.exe não encontrado em {RAR_EXE}")
@@ -73,6 +87,7 @@ def main() -> None:
     _write_zip(FIXTURES_DIR / "sem_imagens.cbz", EXTRA_FILES)
     _write_rar(FIXTURES_DIR / "senha.cbr", contents, "-ma5", "-psenha")
     _write_rar(FIXTURES_DIR / "senha_cabecalho.cbr", contents, "-ma5", "-hpsenha")
+    write_subfolder_fixtures()
 
     zip_bytes = (FIXTURES_DIR / "simples.cbz").read_bytes()
     (FIXTURES_DIR / "corrompido.cbz").write_bytes(zip_bytes[:len(zip_bytes) // 2])
