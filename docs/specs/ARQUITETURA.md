@@ -80,7 +80,7 @@ Responsável exclusivamente pela renderização visual, captura de eventos de mo
 * **`SeriesView` (Tela da Série):** Lista os arquivos `.cbr`/`.cbz` da série selecionada em ordem natural (RF05, RF18). Captura o duplo clique para abrir o leitor (RF13) — exibindo mensagem de erro se o arquivo for inválido (RF20) — e o clique direito para alternar manualmente entre *"Lida"* e *"Não lida"* (RF08).
 * **`ReaderView` (Motor Visual de Leitura):** Baseado em `QGraphicsView` + `QGraphicsScene` (acelerado por hardware). Gerencia:
     * Navegação por `Seta Esquerda`, `Seta Direita`, `Espaço` e `ESC`, botão "Fechar" (`✕`) sobreposto e indicador de página (RF14);
-    * Zoom matricial suave no cursor via `Ctrl + Scroll` (RF15);
+    * Zoom matricial suave no cursor via `Ctrl + Scroll`, mantido ao virar a página, e retorno ao ajuste à tela via `Ctrl + 0` (RF15);
     * Alternância de layout entre 1 ou 2 páginas lado a lado via `Ctrl + S` (RF16);
     * Disparo da exportação de página via `Ctrl + P` (RF17).
 * **Workers (`QThread`):**
@@ -286,7 +286,7 @@ sequenceDiagram
     UI-->>User: Fecha o diálogo e atualiza o card da série
 ```
 
-### 4.3. Leitura, Pareamento Duplo, Bookmark e Exportação `Ctrl+P` (RF06, RF07, RF14, RF16, RF17, RF20)
+### 4.3. Leitura, Pareamento Duplo, Bookmark e Exportação `Ctrl+P` (RF06, RF07, RF14, RF15, RF16, RF17, RF20)
 ```mermaid
 sequenceDiagram
     actor User as Usuário
@@ -331,7 +331,7 @@ sequenceDiagram
         Lib->>Lib: Recalcula X/Y e status da série
         Lib->>Repo: save() (imediato)
     end
-    RView-->>User: Nova(s) página(s), zoom ajustado à tela
+    RView-->>User: Nova(s) página(s) com o zoom mantido (no canto superior esquerdo, se ampliada)
 
     User->>RView: Ctrl + P (capturar página)
     RView->>RServ: visible_page_bytes() (bytes originais, ignora o zoom)

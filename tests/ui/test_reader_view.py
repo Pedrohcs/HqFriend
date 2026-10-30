@@ -144,7 +144,8 @@ def test_ctrl_s_exibindo_o_ultimo_par_conclui_a_hq(window):
     assert completed.count == 1
 
 
-def test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta(window):
+def test_ctrl_scroll_aplica_zoom_e_arraste(window):
+    # RF15-CA1
     reader = _open(window)
     fit_scale = _scale(reader)
 
@@ -157,11 +158,6 @@ def test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta(window):
     _wheel(reader, -120)
     assert reader.zoom_factor < 1.0
     assert reader.dragMode() == QGraphicsView.NoDrag
-
-    _wheel(reader, 120)
-    _key(reader, Qt.Key_Right)
-    assert reader.zoom_factor == 1.0
-    assert _scale(reader) == pytest.approx(fit_scale)
 
 
 def test_zoom_fica_entre_os_limites(window):
@@ -285,17 +281,18 @@ def test_viradas_seguidas_adiam_a_gravacao_do_bookmark(window, library):
     assert saved.current_page == 2
 
 
-@pytest.fixture
-def illegible_window(qapp, services, tmp_path):
-    """Biblioteca com uma HQ válida cuja 2ª de 3 páginas não é uma imagem decodificável."""
-    root = tmp_path / "HQ-ilegivel"
-    (root / "Ilegível").mkdir(parents=True)
+def _jpeg(size) -> bytes:
     page = io.BytesIO()
-    Image.new("RGB", (400, 600), (20, 120, 20)).save(page, format="JPEG")
-    with zipfile.ZipFile(root / "Ilegível" / "Ilegível 1.cbz", "w") as zf:
-        zf.writestr("1.jpg", page.getvalue())
-        zf.writestr("2.jpg", b"isto nao e uma imagem" * 50)
-        zf.writestr("3.jpg", page.getvalue())
+    Image.new("RGB", size, (20, 120, 20)).save(page, format="JPEG")
+    return page.getvalue()
+
+
+def _window_with_comic(services, root, series, pages):
+    """MainWindow na Tela da Série de uma HQ única `<série> 1.cbz` com as páginas dadas."""
+    (root / series).mkdir(parents=True)
+    with zipfile.ZipFile(root / series / f"{series} 1.cbz", "w") as zf:
+        for name, data in pages:
+            zf.writestr(name, data)
     library, covers = services
     main = MainWindow(library, covers)
     main.resize(1280, 800)
@@ -303,7 +300,16 @@ def illegible_window(qapp, services, tmp_path):
     loaded = SignalRecorder(main.home_view.library_loaded)
     main.home_view.set_root_directory(root)
     loaded.wait()
-    main.show_series("Ilegível")
+    main.show_series(series)
+    return main
+
+
+@pytest.fixture
+def illegible_window(qapp, services, tmp_path):
+    """Biblioteca com uma HQ válida cuja 2ª de 3 páginas não é uma imagem decodificável."""
+    page = _jpeg((400, 600))
+    main = _window_with_comic(services, tmp_path / "HQ-ilegivel", "Ilegível", [
+        ("1.jpg", page), ("2.jpg", b"isto nao e uma imagem" * 50), ("3.jpg", page)])
     yield main
     main.close()
     main.deleteLater()
@@ -336,6 +342,145 @@ def test_decode_page_usa_placeholder_para_bytes_invalidos(qapp):
 
     assert not image.isNull()
     assert (image.width(), image.height()) == (600, 900)
+
+
+# ---- Zoom mantido entre páginas (FEAT-14) ----------------------------------------------------
+
+@pytest.fixture
+def zoom_window(qapp, services, tmp_path):
+    """HQ com páginas de tamanhos diferentes: o ajuste à tela de cada uma tem escala própria."""
+    portrait, wide = _jpeg((400, 600)), _jpeg((1200, 600))
+    main = _window_with_comic(services, tmp_path / "HQ-zoom", "Zoom", [
+        ("1.jpg", portrait), ("2.jpg", wide), ("3.jpg", portrait)])
+    yield main
+    main.close()
+    main.deleteLater()
+
+
+def _open_zoom(window):
+    window.series_view.comic_open_requested.emit("Zoom", "Zoom 1.cbz")
+    return window.reader_view
+
+
+def _fit_scale(view) -> float:
+    """Escala do ajuste à tela calculada à parte (fitInView reserva 2px de margem por lado)."""
+    viewport, scene = view.viewport().rect(), view.sceneRect()
+    return min((viewport.width() - 4) / scene.width(), (viewport.height() - 4) / scene.height())
+
+
+def _scene_top_left(view):
+    return view.mapFromScene(view.sceneRect().topLeft())
+
+
+def test_virar_pagina_mantem_o_zoom(zoom_window):
+    # FEAT-14 / RF15-CA2
+    reader = _open_zoom(zoom_window)
+    assert _scale(reader) == pytest.approx(_fit_scale(reader), rel=1e-3)
+    first_fit = _fit_scale(reader)
+    _wheel(reader, 120)
+    _wheel(reader, 120)
+    zoom = 1.15 ** 2
+
+    _key(reader, Qt.Key_Right)  # página larga: ajuste à tela com outra escala
+    assert _fit_scale(reader) != pytest.approx(first_fit, rel=1e-2)
+    assert reader.zoom_factor == pytest.approx(zoom)
+    assert _scale(reader) == pytest.approx(_fit_scale(reader) * zoom, rel=1e-3)
+    assert reader.dragMode() == QGraphicsView.ScrollHandDrag
+
+    _key(reader, Qt.Key_Left)
+    assert reader.zoom_factor == pytest.approx(zoom)
+    assert _scale(reader) == pytest.approx(first_fit * zoom, rel=1e-3)
+
+    _key(reader, Qt.Key_0, Qt.ControlModifier)
+    _wheel(reader, -120)  # zoom reduzido também é mantido
+    _key(reader, Qt.Key_Right)
+    assert reader.zoom_factor == pytest.approx(1 / 1.15)
+    assert _scale(reader) == pytest.approx(_fit_scale(reader) / 1.15, rel=1e-3)
+    assert reader.dragMode() == QGraphicsView.NoDrag
+
+
+def test_zoom_volta_exatamente_a_1x(window):
+    # FEAT-14 / RF15-CA2
+    reader = _open(window)
+    for _ in range(7):
+        _wheel(reader, 120)
+    for _ in range(7):
+        _wheel(reader, -120)
+
+    assert reader.zoom_factor == 1.0
+    assert reader.dragMode() == QGraphicsView.NoDrag
+    window.resize(900, 1000)  # em 1x, a página acompanha o novo tamanho
+    QTest.qWait(50)
+    _assert_page_fits_view(reader)
+
+
+def test_pagina_ampliada_abre_no_canto_superior_esquerdo(zoom_window):
+    # FEAT-14 / RF15-CA3
+    reader = _open_zoom(zoom_window)
+    for _ in range(5):
+        _wheel(reader, 120)  # ~2x
+    bars = (reader.horizontalScrollBar(), reader.verticalScrollBar())
+
+    for key in (Qt.Key_Right, Qt.Key_Left):  # avançar e voltar
+        for bar in bars:
+            bar.setValue(bar.maximum())  # como se o usuário tivesse arrastado a página
+        _key(reader, key)
+        assert reader.verticalScrollBar().maximum() > 0  # a página não cabe na tela
+        assert all(bar.value() == bar.minimum() for bar in bars)
+        assert _scene_top_left(reader).y() == pytest.approx(0, abs=1)
+
+    _key(reader, Qt.Key_Right)  # página larga: excede a tela também na horizontal
+    assert reader.horizontalScrollBar().maximum() > 0
+    assert _scene_top_left(reader).x() == pytest.approx(0, abs=1)
+
+    _key(reader, Qt.Key_0, Qt.ControlModifier)
+    _wheel(reader, -120)
+    _key(reader, Qt.Key_Right)  # zoom < 1x: a página fica centralizada
+    mapped = reader.mapFromScene(reader.sceneRect()).boundingRect()
+    viewport = reader.viewport().rect()
+    assert abs(mapped.center().x() - viewport.center().x()) <= 2
+    assert abs(mapped.center().y() - viewport.center().y()) <= 2
+
+
+def test_abrir_hq_comeca_ajustada_a_tela(window, library):
+    # FEAT-14 / RF15-CA4
+    reader = _open(window)
+    _wheel(reader, 120)
+    _key(reader, Qt.Key_Right)
+    assert reader.zoom_factor == pytest.approx(1.15)
+    _key(reader, Qt.Key_Escape)
+
+    _open(window)  # a mesma HQ
+    assert reader.zoom_factor == 1.0
+    assert reader.dragMode() == QGraphicsView.NoDrag
+    _assert_page_fits_view(reader)
+
+    _wheel(reader, 120)
+    _key(reader, Qt.Key_Escape)
+    _open(window, "Batman 2.cbr")  # outra HQ
+    assert reader.zoom_factor == 1.0
+    _assert_page_fits_view(reader)
+    _key(reader, Qt.Key_Escape)
+
+    assert "zoom" not in library._repository.load().state.model_dump_json()
+
+
+def test_ctrl_0_restaura_ajuste_a_tela(window):
+    # FEAT-14 / RF15-CA5
+    reader = _open(window)
+    fit_scale = _scale(reader)
+    for _ in range(3):
+        _wheel(reader, 120)
+
+    _key(reader, Qt.Key_0, Qt.ControlModifier)
+    assert reader.zoom_factor == 1.0
+    assert _scale(reader) == pytest.approx(fit_scale)
+    assert reader.dragMode() == QGraphicsView.NoDrag
+    _assert_page_fits_view(reader)
+
+    _key(reader, Qt.Key_0, Qt.ControlModifier)  # já em 1x: nada muda
+    assert reader.zoom_factor == 1.0
+    assert _scale(reader) == pytest.approx(fit_scale)
 
 
 # ---- Exportação Ctrl + P (FEAT-12) -----------------------------------------------------------
