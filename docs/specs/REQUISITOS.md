@@ -2,7 +2,7 @@
 
 > **Spec vigente.** Este documento descreve o comportamento **atual** do sistema na branch `main` e deve estar sempre alinhado ao código. Mudanças entram por um pacote em `docs/changes/` (ver `docs/README.md`) e são aplicadas aqui na etapa de **Sincronização**.
 >
-> * **Versão da spec:** `1.0.1` (2026-10-29) — escopo entregue pelas FEAT-01 a FEAT-13 e pelo FIX-01.
+> * **Versão da spec:** `1.1` (2026-10-29) — escopo entregue pelas FEAT-01 a FEAT-13, pelo FIX-01 e pela FEAT-14.
 > * **Convenções de ID:** `RFxx` / `RNFxx` / `USxx` nunca são reaproveitados. Cada requisito tem critérios de aceite próprios (`RFxx-CAn`), referenciados nos testes e nos pacotes de FIX. Requisitos removidos permanecem no documento com status `Obsoleto (FEAT-NN)`.
 > * **Status de requisito:** `Ativo` | `Obsoleto (FEAT-NN)`. A linha **Origem** indica o pacote que criou o requisito e os que o alteraram depois.
 > * **Verificação:** cada critério é verificado de forma **automática** (teste pytest) ou **manual** (roteiro no executável). A seção 7 (Matriz de Rastreabilidade) liga cada critério à sua verificação. Testes novos citam o critério (`# RF14-CA3`).
@@ -189,11 +189,14 @@ Critérios de aceite:
 * **RF14-CA4:** Durante a leitura, um indicador sobreposto mostra a posição atual: `Pág. N / Total` no modo único e `Págs. N–M / Total` no modo duplo.
 
 #### RF15 — Controle de Zoom (`Ctrl + Scroll`)
-`Ativo` · Origem: v1.0 (FEAT-11), FIX-01
+`Ativo` · Origem: v1.0 (FEAT-11), FIX-01, FEAT-14
 
-O usuário deve poder ampliar (zoom in) ou reduzir (zoom out) o tamanho da página atual utilizando o atalho `Ctrl + Scroll do mouse`.
+O usuário deve poder ampliar (zoom in) ou reduzir (zoom out) o tamanho da página atual utilizando o atalho `Ctrl + Scroll do mouse`. O nível de zoom escolhido é **mantido ao trocar de página** durante a leitura da HQ, para que o usuário não precise refazê-lo a cada página. O zoom é relativo ao ajuste à tela (*Fit-to-View*) de cada página: 1x é a página inteira visível; 2x é o dobro desse tamanho, qualquer que seja a resolução da página.
 * **RF15-CA1:** `Ctrl + Scroll` aplica zoom ancorado no cursor, limitado entre 0,5x e 5x; com zoom acima de 1x, a página pode ser arrastada com o mouse.
-* **RF15-CA2:** Virar a página ou alternar o modo (`Ctrl + S`) restaura o ajuste à tela (*Fit-to-View*). Ao redimensionar a janela, a página acompanha o novo tamanho se estiver ajustada à tela (zoom 1x); com zoom ampliado, o zoom escolhido é preservado.
+* **RF15-CA2:** Virar a página (`→`, `Espaço`, `←`) **mantém o nível de zoom** atual, aplicado sobre o ajuste à tela da nova página (ou do novo par). Alternar o modo (`Ctrl + S`) restaura o ajuste à tela (QA-09). Ao redimensionar a janela, a página acompanha o novo tamanho se estiver ajustada à tela (zoom 1x); com outro zoom, o zoom escolhido é preservado.
+* **RF15-CA3:** Ao virar a página com zoom acima de 1x, a nova página é exibida a partir do **canto superior esquerdo** (início da leitura), tanto ao avançar quanto ao voltar (QA-08). Com zoom de até 1x, a página fica centralizada.
+* **RF15-CA4:** O zoom vale para a HQ aberta: ao fechar a HQ e abrir esta ou outra, a leitura começa com o ajuste à tela (QA-07). O zoom não é gravado no `state.json`.
+* **RF15-CA5:** `Ctrl + 0` restaura o ajuste à tela (zoom 1x) a qualquer momento da leitura (QA-10).
 
 #### RF16 — Alternância de Modo de Página (`Ctrl + S`)
 `Ativo` · Origem: v1.0 (FEAT-11)
@@ -301,7 +304,7 @@ A interface deve usar um tema escuro único, definido em uma folha de estilos em
 * **US06 — Listagem e Marcação Manual de HQ:** Como leitor, quero abrir uma série para ver seus arquivos `.cbr`/`.cbz` em ordem natural e poder clicar com o botão direito em uma HQ específica para marcá-la manualmente como "Lida" ou "Não lida".
 * **US07 — Leitura e Retomada de Progresso (Bookmark):** Como leitor, quero dar duplo clique em uma HQ para lê-la usando as `Setas (Esquerda/Direita)` ou `Espaço`, e quero que o sistema lembre em qual página parei caso eu feche antes do fim.
 * **US08 — Conclusão Automática ao Atingir a Última Página:** Como leitor, quero que a HQ seja marcada automaticamente como "Lida" quando a última página aparecer na tela, atualizando o contador da série e marcando a série como "Lida" caso seja a última obra pendente.
-* **US09 — Controle de Zoom na Leitura:** Como leitor, quero usar `Ctrl + Scroll do mouse` para ajustar o zoom da página durante a leitura.
+* **US09 — Controle de Zoom na Leitura:** Como leitor, quero usar `Ctrl + Scroll do mouse` para ajustar o zoom da página durante a leitura e que esse zoom seja mantido quando eu virar a página, para não precisar ajustá-lo de novo a cada página.
 * **US10 — Alternância entre Página Única e Dupla:** Como leitor, quero usar `Ctrl + S` para alternar entre página única e página dupla (com pareamento iniciando na página 1).
 * **US11 — Captura de Página Unificada ou Simples:** Como leitor, quero usar `Ctrl + P` para salvar a visualização atual em `%IMAGENS%\HQs` com o nome `NomeDaSerie_NomeDoArquivo_PagXX.png`, unindo as duas páginas lado a lado (centralizadas sobre fundo preto) em uma única imagem quando eu estiver no modo de página dupla, sem sobrescrever capturas anteriores.
 * **US12 — Persistência Local Transparente:** Como leitor, quero que todo o meu histórico de leitura, diretório configurado, páginas atuais e capas escolhidas fiquem salvos em estrutura JSON dentro de `%DOCUMENTOS%\HqFriend`, protegidos contra corrupção.
@@ -377,8 +380,10 @@ graph TD
     SaveJSON3 --> ReadingLoop
 
     %% Atalhos de Visualização e Captura
-    ReadingLoop -->|Ctrl + Scroll| ZoomPage[Ajustar Zoom da Página]
+    ReadingLoop -->|Ctrl + Scroll| ZoomPage[Ajustar Zoom da Página<br/>mantido ao virar a página]
     ZoomPage --> ReadingLoop
+    ReadingLoop -->|Ctrl + 0| FitPage[Restaurar ajuste à tela]
+    FitPage --> ReadingLoop
 
     ReadingLoop -->|Ctrl + S| ToggleMode[Alternar Página Única / Página Dupla<br/>Pareamento a partir da Pág 1]
     ToggleMode --> VisibleChanged
@@ -406,6 +411,10 @@ graph TD
 | **QA-04** | Caminhos de dados e de exportação. | **Decidida em 2026-10-24 (retroativa, FIX-01):** pastas conhecidas do Windows `%DOCUMENTOS%` / `%IMAGENS%`, respeitando OneDrive (ADR-05). | Caminhos fixos com o nome do usuário (quebram em outra máquina e com o OneDrive). |
 | **QA-05** | O leitor deve ter botão de fechar, como cita o RF14? | **Decidida em 2026-10-29 (FIX-01):** sim — botão `✕` sobreposto, com o mesmo efeito do `ESC` (RF14-CA3). | Remover o botão da spec e manter só o `ESC` (pior para quem usa só o mouse). |
 | **QA-06** | Momento de gravação do bookmark durante a leitura. | **Decidida em 2026-10-29 (FIX-01):** manter o implementado — grava 500 ms após a última virada (*debounce*), e de imediato ao fechar, concluir ou sair (RF06-CA5). | Gravação periódica garantida a cada 500 ms mesmo com viradas contínuas (*throttle*): mais escritas no disco para ganhar, no pior caso, as viradas do último meio segundo antes de uma queda do app. |
+| **QA-07** | Por quanto tempo o zoom é mantido? | **Decidida em 2026-10-29 (FEAT-14):** enquanto a HQ estiver aberta; abrir uma HQ começa no ajuste à tela, e o zoom não é gravado no `state.json` (RF15-CA4). | Manter durante toda a execução do app, valendo para a próxima HQ. Persistir no `state.json` como preferência global (exigiria nova versão do schema e migração). |
+| **QA-08** | Com a página ampliada, que parte da nova página aparece ao virar? | **Decidida em 2026-10-29 (FEAT-14):** o canto superior esquerdo, ao avançar e ao voltar (RF15-CA3). | Topo centralizado na horizontal. Mesma posição relativa da página anterior. Voltar abrindo no canto inferior direito. |
+| **QA-09** | O que acontece com o zoom ao alternar o modo único/duplo (`Ctrl + S`)? | **Decidida em 2026-10-29 (FEAT-14):** restaura o ajuste à tela, como na v1.0 (RF15-CA2): a troca de layout muda o tamanho do conteúdo. | Manter o fator de zoom também na alternância. |
+| **QA-10** | Como voltar ao ajuste à tela, já que virar a página deixa de fazer isso? | **Decidida em 2026-10-29 (FEAT-14):** atalho `Ctrl + 0` (RF15-CA5). | Sem atalho novo (reduzir com `Ctrl + Scroll` ou alternar o modo duas vezes). `Ctrl + 0` e também duplo clique na página. |
 
 > **Limitações conhecidas (aceitas com a QA-01):**
 > * Uma segunda biblioteca com séries e arquivos de mesmo nome herda o progresso já registrado para esses nomes.
@@ -417,7 +426,7 @@ graph TD
 
 > Liga cada critério de aceite à sua verificação. Ao criar ou alterar um critério, o pacote (FEAT/FIX) atualiza a linha correspondente na etapa de Sincronização.
 
-**Resumo (FIX-01, 2026-10-29):** 84 critérios — 74 automáticos, 6 automáticos com complemento manual, 4 manuais e 0 lacunas. Caminhos relativos a `tests/`. As 3 lacunas encontradas na montagem da matriz (RF15-CA2, RF17-CA4 e RNF06-CA2) foram cobertas por testes no próprio FIX-01. Uma **lacuna** é um critério sem teste nem roteiro que o cubra por inteiro; cada lacuna é resolvida criando o teste ou aceitando-a como manual, com registro no pacote.
+**Resumo (FEAT-14, 2026-10-29):** 87 critérios — 74 automáticos, 9 automáticos com complemento manual, 4 manuais e 0 lacunas. A FEAT-14 acrescentou RF15-CA3 a CA5 e passou RF15-CA2, CA3 e CA5 a ter complemento manual no roteiro M2. Caminhos relativos a `tests/`. As 3 lacunas encontradas na montagem da matriz (RF15-CA2, RF17-CA4 e RNF06-CA2) foram cobertas por testes no próprio FIX-01. Uma **lacuna** é um critério sem teste nem roteiro que o cubra por inteiro; cada lacuna é resolvida criando o teste ou aceitando-a como manual, com registro no pacote.
 
 | Critério | Verificação | Teste(s) / roteiro |
 | :--- | :--- | :--- |
@@ -474,8 +483,11 @@ graph TD
 | RF14-CA2 | Automática | `ui/test_reader_view.py::test_esc_na_metade_e_reabrir_retoma_da_pagina`<br>`ui/test_reader_view.py::test_ultima_pagina_marca_hq_como_lida_e_atualiza_serie` |
 | RF14-CA3 | Automática | `ui/test_reader_view.py::test_botao_fechar_volta_para_a_serie`<br>`ui/test_reader_view.py::test_botao_fechar_acompanha_o_redimensionamento` |
 | RF14-CA4 | Automática | `ui/test_reader_view.py::test_duplo_clique_em_hq_valida_abre_o_leitor`<br>`ui/test_reader_view.py::test_ctrl_s_alterna_pagina_dupla_lado_a_lado` |
-| RF15-CA1 | Automática | `ui/test_reader_view.py::test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta`<br>`ui/test_reader_view.py::test_zoom_fica_entre_os_limites`<br>`ui/test_reader_view.py::test_scroll_sem_ctrl_nao_altera_zoom` |
-| RF15-CA2 | Automática | `ui/test_reader_view.py::test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta`<br>`ui/test_reader_view.py::test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela` |
+| RF15-CA1 | Automática | `ui/test_reader_view.py::test_ctrl_scroll_aplica_zoom_e_arraste`<br>`ui/test_reader_view.py::test_zoom_fica_entre_os_limites`<br>`ui/test_reader_view.py::test_scroll_sem_ctrl_nao_altera_zoom` |
+| RF15-CA2 | Automática + Manual | `ui/test_reader_view.py::test_virar_pagina_mantem_o_zoom`<br>`ui/test_reader_view.py::test_zoom_volta_exatamente_a_1x`<br>`ui/test_reader_view.py::test_ctrl_s_e_redimensionar_reajustam_a_pagina_a_tela`<br>Roteiro M2 (zoom) |
+| RF15-CA3 | Automática + Manual | `ui/test_reader_view.py::test_pagina_ampliada_abre_no_canto_superior_esquerdo`<br>Roteiro M2 (zoom) |
+| RF15-CA4 | Automática | `ui/test_reader_view.py::test_abrir_hq_comeca_ajustada_a_tela` |
+| RF15-CA5 | Automática + Manual | `ui/test_reader_view.py::test_ctrl_0_restaura_ajuste_a_tela`<br>Roteiro M2 (zoom) |
 | RF16-CA1 | Automática | `services/test_reader_service.py::test_pagina_dupla_pareia_a_partir_da_primeira_pagina`<br>`ui/test_reader_view.py::test_ctrl_s_alterna_pagina_dupla_lado_a_lado` |
 | RF16-CA2 | Automática | `services/test_reader_service.py::test_ativar_pagina_dupla_em_indice_impar_alinha_ao_par`<br>`services/test_reader_service.py::test_bookmark_impar_abre_alinhado_em_pagina_dupla` |
 | RF16-CA3 | Automática | `services/test_reader_service.py::test_pagina_dupla_pareia_a_partir_da_primeira_pagina` |
@@ -511,5 +523,5 @@ graph TD
 | Roteiro | Onde | Passos | Critérios |
 | :--- | :--- | :--- | :--- |
 | **M1** | Código-fonte (`python -m src.main`) ou executável | Com uma raiz já configurada, abrir o aplicativo: a janela abre maximizada na Tela Inicial e carrega as séries da raiz salva. | RF02-CA1, RF02-CA4 |
-| **M2** | Executável `dist\HqFriend\HqFriend.exe` | (1) Abrir o app: sem janela de console, com o ícone e o tema escuro em telas, menus e diálogos; status "Lida" verde, "Em andamento" âmbar, "Não lida" cinza. (2) Ler um `.cbz` e um `.cbr` reais (nenhuma janela de console ao abrir o `.cbr`); usar o botão "Fechar". (3) `Ctrl + P` salva em `Imagens\HQs`. (4) Com o app aberto, abrir uma segunda instância: aviso "O HqFriend já está aberto." e a nova instância encerra. (5) Conferir `Documentos\HqFriend` (`state.json`, `covers\`, `logs\`). | RNF01-CA1, RNF01-CA2, RNF04-CA5, RNF07-CA1, RNF08-CA1, RNF08-CA2 |
-| **M3** | Executável, máquina de referência | (1) Virar páginas de HQ com páginas JPEG de ~3 MB em 1920×1080, em CBZ e CBR *solid*: menos de 200 ms por virada. (2) Biblioteca com 100+ séries: a interface continua respondendo durante a varredura e a geração de capas. | RNF05-CA1, RNF05-CA2 |
+| **M2** | Executável `dist\HqFriend\HqFriend.exe` | (1) Abrir o app: sem janela de console, com o ícone e o tema escuro em telas, menus e diálogos; status "Lida" verde, "Em andamento" âmbar, "Não lida" cinza. (2) Ler um `.cbz` e um `.cbr` reais (nenhuma janela de console ao abrir o `.cbr`); usar o botão "Fechar". (3) `Ctrl + P` salva em `Imagens\HQs`. (4) Com o app aberto, abrir uma segunda instância: aviso "O HqFriend já está aberto." e a nova instância encerra. (5) Conferir `Documentos\HqFriend` (`state.json`, `covers\`, `logs\`). (6) Zoom: ampliar com `Ctrl + Scroll`, virar páginas para frente e para trás (o zoom é mantido e a página abre no canto superior esquerdo) e `Ctrl + 0` (volta a ajustar à tela). | RNF01-CA1, RNF01-CA2, RNF04-CA5, RNF07-CA1, RNF08-CA1, RNF08-CA2, RF15-CA2, RF15-CA3, RF15-CA5 |
+| **M3** | Executável, máquina de referência | (1) Virar páginas de HQ com páginas JPEG de ~3 MB em 1920×1080, em CBZ e CBR *solid*: menos de 200 ms por virada, também com zoom de 2x mantido entre as páginas (FEAT-14). (2) Biblioteca com 100+ séries: a interface continua respondendo durante a varredura e a geração de capas. | RNF05-CA1, RNF05-CA2 |

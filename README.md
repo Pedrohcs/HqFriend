@@ -17,7 +17,7 @@ Funciona **100% offline**: não precisa de internet nem de servidor. O progresso
 - **Status dinâmico:** se uma série "Lida" recebe um arquivo novo, ela volta a ficar "Em andamento".
 - **Leitor integrado:**
   - página única ou dupla (pares 1–2, 3–4, …);
-  - zoom no ponto do cursor e arrastar a página ampliada;
+  - zoom no ponto do cursor, mantido ao virar a página, e arrastar a página ampliada;
   - indicador de página e botão "Fechar" (`✕`) no canto superior direito;
   - páginas ilegíveis aparecem como um quadro "Página ilegível", sem interromper a leitura;
   - troca de página em menos de 200 ms, com as próximas páginas carregadas em segundo plano.
@@ -165,7 +165,8 @@ graph TD
 | Leitor | `→` ou `Espaço` | Próxima página (ou par) |
 | Leitor | `←` | Página (ou par) anterior |
 | Leitor | `Ctrl + S` | Alternar página única / dupla |
-| Leitor | `Ctrl + Scroll` | Zoom (0,5x a 5x) |
+| Leitor | `Ctrl + Scroll` | Zoom (0,5x a 5x), mantido ao virar a página |
+| Leitor | `Ctrl + 0` | Voltar a ajustar a página à tela |
 | Leitor | Arrastar com o mouse | Mover a página ampliada |
 | Leitor | `Ctrl + P` | Salvar a página como PNG |
 | Leitor | `Esc` ou botão `✕` | Fechar a HQ |

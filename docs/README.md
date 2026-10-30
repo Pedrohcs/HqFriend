@@ -27,16 +27,16 @@ docs/
 
 ## Próximos IDs Livres
 
-Atualize esta tabela ao reservar um ID (IDs **nunca** são reaproveitados, nem de itens cancelados ou obsoletos). Um pacote reserva seus IDs quando o `spec.md` / `fix.md` é criado. Reservas atuais: nenhuma (os IDs reservados pelo **FIX-01** — RF21, RNF08, QA-02 a QA-06 e ADR-09 a ADR-13 — já estão aplicados).
+Atualize esta tabela ao reservar um ID (IDs **nunca** são reaproveitados, nem de itens cancelados ou obsoletos). Um pacote reserva seus IDs quando o `spec.md` / `fix.md` é criado. Reservas atuais: nenhuma (os IDs reservados pelo **FIX-01** — RF21, RNF08, QA-02 a QA-06 e ADR-09 a ADR-13 — e pela **FEAT-14** — QA-07 a QA-10 — já estão aplicados).
 
 | Tipo | Próximo | Onde fica |
 | :--- | :--- | :--- |
-| Feature | `FEAT-14` | `changes/FEAT-14/` |
+| Feature | `FEAT-15` | `changes/FEAT-15/` |
 | Correção | `FIX-02` | `changes/FIX-02/` |
 | Requisito funcional | `RF22` | `specs/REQUISITOS.md` §2 |
 | Requisito não funcional | `RNF09` | `specs/REQUISITOS.md` §3 |
 | História de usuário | `US14` | `specs/REQUISITOS.md` §4 |
-| Questão de decisão | `QA-07` | `spec.md` do pacote → `specs/REQUISITOS.md` §6 |
+| Questão de decisão | `QA-11` | `spec.md` do pacote → `specs/REQUISITOS.md` §6 |
 | Decisão arquitetural | `ADR-14` | `adr/ADR-14-<slug>.md` |
 
 ## Ciclo de uma FEAT

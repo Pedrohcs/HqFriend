@@ -10,7 +10,7 @@
 
 ## Quadro de Features
 
-**Etapa Atual:** ✅ **v1.0.1 entregue** — v1.0 (FEAT-01 a FEAT-13) + **FIX-01** concluído. Nenhum pacote em andamento; próximos IDs livres: `FEAT-14` / `FIX-02`.
+**Etapa Atual:** ✅ **v1.1 entregue** — v1.0.1 + **FEAT-14** concluída. Nenhum pacote em andamento; próximos IDs livres: `FEAT-15` / `FIX-02`. Próximos IDs livres: `FEAT-15` / `FIX-02`.
 
 | ID | Fase / Versão | Feature / Correção | Requisitos / US | Status | Pacote | Observações / Bloqueios |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -28,6 +28,7 @@
 | **FEAT-12** | Fase 5 (v1.0) | Serviço de Captura e Exportação de Página `Ctrl + P` (`%IMAGENS%\HQs`) | RF17, RNF03, US11 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Exportação em segundo plano (PNG duplo leva ~2,8 s) |
 | **FEAT-13** | Fase 5 (v1.0) | Empacotamento e Build do Executável Windows (`HqFriend.exe`, onedir) | RNF01, RNF04 | `concluida` | [v1.0](archive/v1.0/PLANO_DESENVOLVIMENTO.md) | Executável validado pelo usuário |
 | **FIX-01** | v1.0.1 | Sincronização da spec com o código da v1.0 e botão "Fechar" do leitor | RF02, RF06, RF12, RF13, RF14, RF15, RF19, RF21, RNF06, RNF07, RNF08 | `concluida` | [FIX-01](archive/v1.0.1/FIX-01/fix.md) | Misto: Tipo A (botão do RF14) + Tipo B (spec). 4 blocos concluídos; executável validado pelo usuário (roteiro M2) |
+| **FEAT-14** | v1.1 | Manter o zoom ao trocar de página | RF15, US09 | `concluida` | [FEAT-14](archive/v1.1/FEAT-14/spec.md) | QA-07 a QA-10 (opção A); 250 testes; executável validado pelo usuário (roteiros M2 e M3) |
 
 ---
 
@@ -342,4 +343,63 @@
     * **Pacote arquivado** em `docs/archive/v1.0.1/FIX-01/`.
     * **A cargo do usuário:** commit de fechamento, tag `v1.0.1` e MR para a `main` (a branch `fix/FIX-01-sincronizacao-spec-v1.0` também leva as FEAT-07 a FEAT-13, ainda não integradas à `main`).
     * `FIX-01` $\rightarrow$ `concluida`.
+
+
+### [Registro #031] — 2026-10-29 — FEAT-14 Especificada (Manter o Zoom ao Trocar de Página)
+* **Responsável:** Tech Lead / Analista de Requisitos Sênior
+* **Etapa Atual:** `FEAT-14` (alvo: v1.1) especificada em `docs/changes/FEAT-14/spec.md`, aguardando a decisão das QA-07 a QA-10 e a aprovação do delta para seguir ao `plan.md`.
+* **Resumo das Mudanças:**
+    * **Pedido do usuário:** manter o zoom ao trocar de página, para não precisar refazê-lo a cada página.
+    * **Classificação:** FEAT, não FIX — o reset do zoom ao virar a página é exigido pelo RF15-CA2 e está implementado conforme a spec.
+    * **Delta proposto:** RF15 modificado (CA2 alterado; novos CA3 — posição da página ampliada, CA4 — zoom vale para a HQ aberta, CA5 — `Ctrl + 0` restaura o ajuste à tela) e US09 modificada. Sem mudança prevista no `state.json` (depende da QA-07).
+    * **Questões abertas:** QA-07 (duração do zoom), QA-08 (posição da nova página ampliada), QA-09 (zoom ao alternar com `Ctrl + S`), QA-10 (como voltar ao ajuste à tela).
+    * **IDs reservados pelo FEAT-14:** QA-07 a QA-10. Próximos IDs livres atualizados em `docs/README.md`.
+    * Branch `feat/FEAT-14-manter-zoom-entre-paginas` criada a partir da `main` (commit `8c643dc`).
+    * `FEAT-14` $\rightarrow$ `pendente`.
+
+### [Registro #032] — 2026-10-29 — FEAT-14: Spec Aprovada e Plano Escrito
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-14` em andamento — etapa 2 (Planejar); `plan.md` e `tasks.md` aguardando revisão do usuário para iniciar a implementação.
+* **Resumo das Mudanças:**
+    * **`spec.md` aprovado pelo usuário** com as opções recomendadas: **QA-07** — o zoom vale enquanto a HQ estiver aberta, sem gravar no `state.json`; **QA-08** — página ampliada abre no canto superior esquerdo, ao avançar e ao voltar; **QA-09** — `Ctrl + S` continua restaurando o ajuste à tela; **QA-10** — novo atalho `Ctrl + 0` para restaurar o ajuste à tela.
+    * **`plan.md`:** mudança restrita a `src/ui/views/reader_view.py` (zoom reaplicado sobre o ajuste à tela de cada página, reset explícito ao abrir a HQ, no `Ctrl + S` e no `Ctrl + 0`, arredondamento do fator para 1.0); sem mudança de schema e sem ADR nova; testes de UI com HQ de páginas de tamanhos diferentes; medição de desempenho com zoom 2x no roteiro M3.
+    * **`tasks.md`:** T1–T7 (implementação e testes) e T8–T11 (sincronização e executável).
+    * `FEAT-14` $\rightarrow$ `em andamento`.
+
+### [Registro #033] — 2026-10-29 — FEAT-14: Implementação Concluída (T1–T7)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-14` em andamento — etapa 3 (Implementar) concluída; próxima: Sincronização da spec (T8–T10) e validação do executável pelo usuário (T11).
+* **Resumo das Mudanças:**
+    * **`plan.md` aprovado pelo usuário.**
+    * **`src/ui/views/reader_view.py`:** novo `_apply_zoom()` (ajusta à tela e reaplica o fator de zoom, relativo a esse ajuste); virar a página mantém o zoom (RF15-CA2); com zoom acima de 1x, a nova página abre no canto superior esquerdo (RF15-CA3); o zoom volta a 1x ao abrir uma HQ (RF15-CA4) e no `Ctrl + S`; novo atalho `Ctrl + 0` (RF15-CA5); fator arredondado para 1.0 quando o resíduo de ponto flutuante é menor que `1e-6`.
+    * **Testes (`tests/ui/test_reader_view.py`):** 5 novos (RF15-CA2 a CA5), com uma HQ de páginas de tamanhos diferentes gerada no próprio teste; `test_ctrl_scroll_aplica_zoom_e_virar_pagina_reseta` renomeado para `test_ctrl_scroll_aplica_zoom_e_arraste` (RF15-CA1), sem a verificação do reset. Os 5 testes novos falham sem a mudança no código.
+    * **250 testes passando**, sem avisos; `tests/ui` repetido 3 vezes sem falhas. Nenhum desvio de comportamento em relação ao plano (detalhes em `tasks.md`).
+
+### [Registro #034] — 2026-10-29 — FEAT-14: Sincronização da Spec Concluída (T8–T10)
+* **Responsável:** Analista de Requisitos Sênior / Tech Lead
+* **Etapa Atual:** `FEAT-14` em andamento — etapa 4 (Sincronizar) concluída; falta a validação do executável pelo usuário (T11, roteiros M2 e M3) para concluir o pacote e arquivá-lo em `docs/archive/v1.1/`.
+* **Resumo das Mudanças:**
+    * **T8 — `specs/REQUISITOS.md`:** versão da spec `1.1`; RF15 com o texto aprovado (CA2 alterado, novos CA3 a CA5, origem `FEAT-14`); US09 atualizada; `Ctrl + 0` no grafo de fluxo (§5); QA-07 a QA-10 na §6; matriz (§7) com **87 critérios** — 74 automáticos, 9 automáticos com complemento manual, 4 manuais e 0 lacunas —, conferida automaticamente contra a spec e a coleta do pytest; roteiro M2 ganhou o passo (6) de zoom e o M3, a medição com zoom 2x.
+    * **T9 — `specs/TECNICO.md`:** §4.2 reescrita (`_apply_zoom()`, posição no canto superior esquerdo, quando o zoom volta a 1x, arredondamento para 1.0, `Ctrl + 0` no `keyPressEvent`); §4.3 com as setas mantendo o zoom e a nova linha `Ctrl + 0`. **`specs/ARQUITETURA.md`:** responsabilidades do `ReaderView` (§2) e diagrama de leitura (§4.3).
+    * **T10 — `README.md`:** zoom mantido entre páginas nas funcionalidades e `Ctrl + 0` na tabela de atalhos.
+    * `docs/README.md`: reservas da FEAT-14 (QA-07 a QA-10) marcadas como aplicadas.
+    * Sem mudança no `state.json` e sem ADR nova, como previsto no `plan.md`.
+
+### [Registro #035] — 2026-10-29 — FEAT-14: Executável Gerado
+* **Responsável:** Tech Lead
+* **Etapa Atual:** `FEAT-14` em andamento — executável gerado; aguardando a validação manual do usuário (T11, roteiros M2 passo 6 e M3).
+* **Resumo das Mudanças:**
+    * Build `.venv\Scripts\pyinstaller.exe --noconfirm --clean HqFriend.spec` concluído sem erros (~23 s) $\rightarrow$ `dist\HqFriend\HqFriend.exe`, com `_internal\bin\UnRAR.exe` e `license.txt`.
+    * Conferido no arquivo PYZ do executável que o `src.ui.views.reader_view` embarcado contém o código da FEAT-14 (`_apply_zoom` e o atalho `Ctrl + 0`).
+
+### [Registro #036] — 2026-10-29 — FEAT-14 Concluída (v1.1)
+* **Responsável:** Tech Lead
+* **Etapa Atual:** ✅ **v1.1 entregue.** Nenhum pacote em andamento; próximos IDs livres: `FEAT-15` / `FIX-02`.
+* **Resumo das Mudanças:**
+    * **Validação manual (T11)** confirmada pelo usuário no executável `dist\HqFriend\HqFriend.exe`: roteiro M2, passo (6) — zoom mantido ao virar a página, página ampliada abrindo no canto superior esquerdo e `Ctrl + 0` — e roteiro M3 com zoom de 2x. Fecha o complemento manual de RF15-CA2, RF15-CA3 e RF15-CA5.
+    * **Definição de Pronto** do `tasks.md` cumprida integralmente.
+    * **Entregas da FEAT-14:** zoom mantido entre páginas, relativo ao ajuste à tela de cada página (RF15-CA2); página ampliada abre no canto superior esquerdo (RF15-CA3); zoom restrito à HQ aberta, sem mudança no `state.json` (RF15-CA4); atalho `Ctrl + 0` (RF15-CA5); spec vigente `1.1` sincronizada; **250 testes** passando.
+    * **Pacote arquivado** em `docs/archive/v1.1/FEAT-14/` (índice em `docs/archive/README.md`).
+    * **A cargo do usuário:** commit, MR da branch `feat/FEAT-14-manter-zoom-entre-paginas` para a `main` e tag `v1.1`.
+    * `FEAT-14` $\rightarrow$ `concluida`.
 

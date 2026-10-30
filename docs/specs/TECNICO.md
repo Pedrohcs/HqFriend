@@ -303,21 +303,23 @@ A `MainWindow` inicia maximizada em **Dark Mode** (`#121212` — RNF08) e conté
 * `Index 1` $\rightarrow$ `SeriesView` (Exibida ao clicar em um card de série na `HomeView`; ao voltar para a `HomeView`, dispara nova sincronização — **RF19**).
 * `Index 2` $\rightarrow$ `ReaderView` (Exibida ao dar duplo clique em uma HQ válida na `SeriesView`, com o título da janela `<arquivo> — HqFriend`; ao pressionar `ESC` ou o botão "Fechar", grava o bookmark pendente, restaura o título `HqFriend` e retorna imediatamente para o `Index 1` atualizando os contadores e badges).
 
-### 4.2. Canvas de Leitura, Zoom, Pan e Reset (`ReaderView`)
+### 4.2. Canvas de Leitura, Zoom, Pan e Ajuste à Tela (`ReaderView`)
 Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fundo preto (`#000000`):
 * **Renderização:** Converte os bytes da página em `QImage` $\rightarrow$ `QPixmap` com `Qt.SmoothTransformation`.
-* **Captura de Teclado:** `QGraphicsView` (via `QAbstractScrollArea`) consome as setas e a barra de espaço para rolagem. A `ReaderView` sobrescreve `keyPressEvent` para tratar `Left`, `Right`, `Space`, `Esc`, `Ctrl + S` e `Ctrl + P` antes da implementação padrão. Os atalhos com `Ctrl` também ficam no `keyPressEvent` (e não em `QShortcut`): o efeito é o mesmo — ativos apenas com o leitor em foco — e o tratamento é testável enviando eventos de teclado ao widget.
+* **Captura de Teclado:** `QGraphicsView` (via `QAbstractScrollArea`) consome as setas e a barra de espaço para rolagem. A `ReaderView` sobrescreve `keyPressEvent` para tratar `Left`, `Right`, `Space`, `Esc`, `Ctrl + S`, `Ctrl + P` e `Ctrl + 0` antes da implementação padrão. Os atalhos com `Ctrl` também ficam no `keyPressEvent` (e não em `QShortcut`): o efeito é o mesmo — ativos apenas com o leitor em foco — e o tratamento é testável enviando eventos de teclado ao widget.
 * **Indicador de Página:** um rótulo sobreposto, centralizado na base, exibe `Pág. N / Total` (ou `Págs. N–M / Total` no modo duplo — RF14-CA4).
 * **Botão "Fechar" (RF14-CA3):** `QPushButton` `✕` filho do `ReaderView` (`objectName="readerCloseButton"`, 32×32, tooltip `Fechar (Esc)`), posicionado no canto superior direito com margem `OVERLAY_MARGIN` = 16 px e reposicionado no `resizeEvent`. Usa `focusPolicy = Qt.NoFocus` para não tirar o foco de teclado do leitor; o clique emite o mesmo `close_requested` do `ESC`.
 * **Página ilegível (RF21):** se nem o Qt nem o Pillow decodificarem os bytes, a página é substituída por um quadro 600×900 com o texto "Página ilegível" e o problema é registrado em log como aviso; a navegação e a conclusão não são afetadas.
-* **Ajuste Inicial e Reset na Virada de Página:**
-    * A função `reset_zoom_fit_to_view()` desfaz a transformação, chama `fitInView(sceneRect, Qt.KeepAspectRatio)` e define `_zoom = 1.0`: o zoom é relativo ao ajuste à tela. As barras de rolagem ficam sempre ocultas.
-    * **Regra validada:** Sempre que o usuário avançar ou voltar de página (`Seta Direita`, `Seta Esquerda`, `Espaço`) ou alternar o modo único/duplo (`Ctrl + S`), `reset_zoom_fit_to_view()` é executado automaticamente. Ao redimensionar a janela, a página é reajustada à tela se o zoom estiver em 1x.
+* **Ajuste à Tela e Zoom Mantido na Virada de Página (RF15-CA2 a CA5):**
+    * `_apply_zoom()` desfaz a transformação, chama `fitInView(sceneRect, Qt.KeepAspectRatio)` e reaplica `scale(_zoom, _zoom)`: o zoom é relativo ao ajuste à tela de cada página, então o mesmo fator vale para páginas de resoluções diferentes. As barras de rolagem ficam sempre ocultas, mas continuam definindo a posição da página.
+    * Com `_zoom > 1`, `_apply_zoom()` leva as barras de rolagem ao mínimo: a página abre no canto superior esquerdo (RF15-CA3). Com `_zoom ≤ 1`, a cena cabe na área visível e o `QGraphicsView` a centraliza.
+    * `reset_zoom_fit_to_view()` define `_zoom = 1.0` e chama `_apply_zoom()`.
+    * **Regra validada:** avançar ou voltar de página (`Seta Direita`, `Seta Esquerda`, `Espaço`) re-renderiza com `render_pages()`, que chama `_apply_zoom()` e **mantém** o zoom. O zoom volta a 1x (`render_pages(reset_zoom=True)` ou `reset_zoom_fit_to_view()`) apenas ao abrir uma HQ (o `ReaderView` é uma instância única reaproveitada entre HQs — RF15-CA4), ao alternar o modo único/duplo (`Ctrl + S`) e no `Ctrl + 0`. O zoom não é persistido (QA-07). Ao redimensionar a janela, a página é reajustada à tela se o zoom estiver em 1x.
 * **Zoom (`Ctrl + Scroll` — RF15) e Arraste com Mouse (*Pan*):**
     * `setDragMode(QGraphicsView.ScrollHandDrag)` só fica ativo com zoom acima de 1x (com zoom ≤ 1x, `NoDrag`): permite clicar e arrastar a página ampliada com o botão esquerdo do mouse.
     * `setTransformationAnchor(QGraphicsView.AnchorUnderMouse)`: O zoom amplia exatamente na região onde o cursor do mouse está apontando.
     * No `wheelEvent(event)`:
-        * Se `event.modifiers() & Qt.ControlModifier`: aplica fator de escala `1.15` (scroll up) ou `1 / 1.15` (scroll down), limitado entre `0.5x` e `5.0x` da escala base.
+        * Se `event.modifiers() & Qt.ControlModifier`: aplica fator de escala `1.15` (scroll up) ou `1 / 1.15` (scroll down), limitado entre `0.5x` e `5.0x` da escala base. Um resultado a menos de `1e-6` de 1.0 é arredondado para exatamente 1.0: sem isso, ampliar e reduzir o mesmo número de vezes deixa um resíduo de ponto flutuante, e a página deixa de acompanhar o redimensionamento.
         * Sem `Ctrl`: permite rolar verticalmente a página caso ela esteja ampliada.
 
 ### 4.3. Mapa de Atalhos e Eventos de Mouse
@@ -331,11 +333,12 @@ Implementado sobre uma subclasse de `QGraphicsView` com `QGraphicsScene` de fund
 | **`CoverPickerDialog`** | Clique na Página + Confirmar, ou duplo clique na miniatura (Passo 2) | Salva a página escolhida em `%DOCUMENTOS%\HqFriend\covers\{Serie}.png` e atualiza o card na `HomeView`. O botão "Definir como capa" só fica habilitado com uma página selecionada (RF12-CA4). |
 | **`SeriesView`** | Duplo Clique na HQ (`itemDoubleClicked`) | Abre `ReaderView` na HQ selecionada (retomando do Bookmark se a HQ não estiver lida). Se o arquivo for inválido, exibe `QMessageBox` de erro e permanece na tela (RF20). |
 | **`SeriesView`** | Clique Direito na HQ | Abre `QMenu` com **"Marcar como lida"** (ou **"Marcar como não lida"** se já estiver lida — zera o bookmark). |
-| **`ReaderView`** | `Right` (Seta Direita) ou `Space` | Avança página/par, reseta o zoom para *Fit-to-View*, agenda a gravação do bookmark (*debounce*) e verifica conclusão. |
-| **`ReaderView`** | `Left` (Seta Esquerda) | Volta página/par, reseta o zoom para *Fit-to-View* e agenda a gravação do bookmark (*debounce*). |
+| **`ReaderView`** | `Right` (Seta Direita) ou `Space` | Avança página/par mantendo o zoom (com zoom > 1x, a página abre no canto superior esquerdo), agenda a gravação do bookmark (*debounce*) e verifica conclusão. |
+| **`ReaderView`** | `Left` (Seta Esquerda) | Volta página/par mantendo o zoom (com zoom > 1x, a página abre no canto superior esquerdo) e agenda a gravação do bookmark (*debounce*). |
 | **`ReaderView`** | `Ctrl + S` | Alterna `double_page_mode` (pareamento a partir da pág 1, preferência persistida), re-renderiza, reseta o zoom, agenda a gravação do bookmark e verifica conclusão. |
 | **`ReaderView`** | `Ctrl + P` | Inicia um `ExportWorker` que chama `ExportService.export_pages()`, salva PNG em `%IMAGENS%\HQs` (sem sobrescrever) e exibe um *Toast* discreto `"Página salva em Imagens\HQs"` + nome do arquivo (ou a mensagem de falha) por 2 segundos. |
-| **`ReaderView`** | `Ctrl + Scroll do Mouse` | Aplica Zoom In / Zoom Out ancorado no cursor. |
+| **`ReaderView`** | `Ctrl + Scroll do Mouse` | Aplica Zoom In / Zoom Out ancorado no cursor; o zoom é mantido ao virar a página. |
+| **`ReaderView`** | `Ctrl + 0` | Restaura o ajuste à tela (*Fit-to-View*, zoom 1x) — `reset_zoom_fit_to_view()`. |
 | **`ReaderView`** | Arrastar com Botão Esquerdo | Move a página ampliada pelo canvas (*Pan*). |
 | **`ReaderView`** | `ESC` ou clique no botão "Fechar" (`✕`) | Grava o bookmark pendente, fecha a leitura da HQ, libera o arquivo `.cbr`/`.cbz` da memória e volta para `SeriesView`. |
 

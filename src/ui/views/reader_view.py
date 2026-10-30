@@ -93,7 +93,7 @@ class ReaderView(QGraphicsView):
     def open_comic(self, series_name: str, comic_filename: str) -> None:
         """Abre a HQ no leitor; lança InvalidComicError se o arquivo for inválido (RF20)."""
         completed = self._reader.open_comic(series_name, comic_filename)
-        self.render_pages()
+        self.render_pages(reset_zoom=True)  # o zoom vale só para a HQ aberta (RF15-CA4)
         self.setFocus()
         if completed:
             self.comic_completed.emit()
@@ -105,7 +105,7 @@ class ReaderView(QGraphicsView):
 
     # ---- Renderização ------------------------------------------------------------------------
 
-    def render_pages(self) -> None:
+    def render_pages(self, reset_zoom: bool = False) -> None:
         images = [self._load_page(index) for index in self._reader.visible_pages()]
         self._scene.clear()
         max_height = max(image.height() for image in images)
@@ -116,7 +116,10 @@ class ReaderView(QGraphicsView):
             item.setPos(x, (max_height - image.height()) / 2)
             x += image.width()
         self._scene.setSceneRect(QRectF(0, 0, x, max_height))
-        self.reset_zoom_fit_to_view()
+        if reset_zoom:
+            self.reset_zoom_fit_to_view()
+        else:
+            self._apply_zoom()  # virar a página mantém o zoom (RF15-CA2)
         self._update_page_indicator()
         self.page_rendered.emit()
 
@@ -154,13 +157,28 @@ class ReaderView(QGraphicsView):
         return self._zoom
 
     def reset_zoom_fit_to_view(self) -> None:
+        self._zoom = 1.0
+        self._apply_zoom()
+
+    def _apply_zoom(self) -> None:
+        """Ajusta a página à tela e reaplica o zoom, que é relativo a esse ajuste (RF15-CA2)."""
         self.resetTransform()
         self.fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
-        self._zoom = 1.0
-        self.setDragMode(QGraphicsView.NoDrag)
+        if self._zoom != 1.0:
+            self.scale(self._zoom, self._zoom)
+        if self._zoom > 1.0:
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            # Página ampliada abre no início da leitura (RF15-CA3); com zoom <= 1x, a cena
+            # cabe na tela e o QGraphicsView a centraliza
+            for bar in (self.horizontalScrollBar(), self.verticalScrollBar()):
+                bar.setValue(bar.minimum())
+        else:
+            self.setDragMode(QGraphicsView.NoDrag)
 
     def zoom_by(self, factor: float) -> None:
         zoom = min(ZOOM_MAX, max(ZOOM_MIN, self._zoom * factor))
+        if abs(zoom - 1.0) < 1e-6:
+            zoom = 1.0  # sem resíduo de ponto flutuante após ampliar e reduzir (RF15-CA2)
         if zoom == self._zoom:
             return
         self.scale(zoom / self._zoom, zoom / self._zoom)
@@ -183,9 +201,11 @@ class ReaderView(QGraphicsView):
         # Tratado antes do QGraphicsView, que consumiria setas e espaço para rolagem
         key, modifiers = event.key(), event.modifiers()
         if modifiers & Qt.ControlModifier and key == Qt.Key_S:
-            self._after_navigation(self._reader.toggle_double_mode())
+            self._after_navigation(self._reader.toggle_double_mode(), reset_zoom=True)
         elif modifiers & Qt.ControlModifier and key == Qt.Key_P:
             self.export_current_view()
+        elif modifiers & Qt.ControlModifier and key == Qt.Key_0:
+            self.reset_zoom_fit_to_view()  # RF15-CA5
         elif key in (Qt.Key_Right, Qt.Key_Space):
             self._after_navigation(self._reader.next_page())
         elif key == Qt.Key_Left:
@@ -197,10 +217,10 @@ class ReaderView(QGraphicsView):
             return
         event.accept()
 
-    def _after_navigation(self, completed: Optional[bool]) -> None:
+    def _after_navigation(self, completed: Optional[bool], reset_zoom: bool = False) -> None:
         if completed is None:
             return  # início/fim da HQ: nada mudou
-        self.render_pages()
+        self.render_pages(reset_zoom)
         if self._reader.has_pending_progress:
             self._flush_timer.start()
         if completed:
